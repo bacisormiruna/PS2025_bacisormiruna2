@@ -1,0 +1,31 @@
+Please upload zip archive with the src folder.
+25 November deadline
+30 November late submissions: 2 (din 10) points penalty for each late day) 
+Evaluation: automated; generated tests
+10p=1p (default)+ 5p (public tests)+ 2p (other tests)+ 2p (coding style)
+
+
+Help - QA
+- TESTATI Proiectul inainte sa-l urcati; vizualizare punctaj partial
+-    Erori TODO sau grade: inca nu s-au implementat cerintele din proiect: Functiile returneaza Debug.todo "cerinta", care duce la erori cand se evaluaza cand e rulat un test;  primul pas (mentionat in PDFul cu cerinta) este sa se inlocuiasca Debug.todo cu orice valoare cu care o sa compileze codul (si la majoritatea Debug.todo este si un comment cu o valoare cu care o sa compileze codul); se cauta in proiect cu grep dupa "Debug.todo", si dupa ce ati inlocuit fiecare Debug.todo cu o valoare ar trebui sa se vada o nota (initial mica) cand ruleaza "npm run grade".
+-  ! Verificati daca ati descarcat Versiunea actualizata la zi (cross-platform new versions) a Fisierului de Upload Assignment (poate fi modificat pana la deadline daca de ex. imcompatibilitati de libraries)
+-   Daca programul care va genereaza teste din exemplele din comentarii (elm-verify-examples) nu recunoaste corect fisierul, inseamna ca NU E Formatat corect codul; la FORMATARE cod manual genereaza toate testele.
+- daca este cazul setati "event-interval" si "event-url"
+- pachete necesare instalate; versiuni noi de elm-test, nu sunt compatibile cu versiuni vechi (verificati daca este specificata versiunea). Daca se ruleaza "npm install" in folderul de proiect se instaleaza versiunea corecta.
+- comentati codul dv.stra cu eroare de compilare + treceti mai departe la cerintele din proiect + la sfarsit reluati functiile comentate
+- pastrati foldere cu versiuni succesive ale proiectului
+- Final: urcati cea mai buna versiune a proiectului;  verificati daca sunt (daca sunt stergeti) inainte de upload librarii suplimentare incluse automat de  VSCode sau alte IDE
+-    (Error "Invalid label throw ...") Teste recunoscute, doar nu sunt asociate cu functia corecta. Documentatia pentru functie sa fie exact inainte de functie, fara linii goale. De ex: (nu exista linii goale intre -} si functie - commentul tine de functie):
+    {-| Documentatie
+    -}
+    functie : ...
+
+Others
+    https://elmprogramming.com/easy-to-test.html
+    https://package.elm-lang.org/packages/elm/url/latest/about
+    npm install elm-test -g
+    npm i elm-verify-examples -g
+    elm install elm/url
+    in folder proiect, comenzile specificate
+    npm install
+    npm run grade
