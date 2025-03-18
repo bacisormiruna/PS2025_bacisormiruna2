@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping(value = "/api/admin")
 @RequiredArgsConstructor
 public class AdminController{
+
     private final UserService userService;
 
     @RequestMapping(value = "/getAll", method = RequestMethod.GET)

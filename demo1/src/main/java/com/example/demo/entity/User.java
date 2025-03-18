@@ -57,4 +57,18 @@ public class User {
     @ManyToOne
     @JoinColumn(name = "role_id")
     private Role role;
+
+    @OneToMany(mappedBy = "sender")
+    private List<Friendship> sentRequests;
+
+    @OneToMany(mappedBy = "receiver")
+    private List<Friendship> receivedRequests;
+
+    @ManyToMany
+    @JoinTable(
+            name = "user_friends",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "friend_id"))
+    private List<User> friends;
+
 }

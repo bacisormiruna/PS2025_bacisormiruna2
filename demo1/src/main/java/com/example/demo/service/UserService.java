@@ -36,11 +36,11 @@ public class UserService{
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
+
     @Autowired
     private AuthenticationManager authenticationManager;
     @Autowired
     private JWTService jwtService;
-
 
     public List<UserViewDTO> findAllUserView() {
 
@@ -162,8 +162,6 @@ public class UserService{
 
     public void changeUserRole(Long id, String roleName) throws UserException {
         User user = userRepository.findById(id).orElseThrow(() -> new UserException("User not found"));
-
-        // Verificăm dacă rolul este valid (optional, dacă ai o entitate de rol)
         Role role = roleRepository.findRoleByName(roleName).orElseThrow(() -> new UserException("Role not found"));
         user.setRole(role);
         userRepository.save(user);

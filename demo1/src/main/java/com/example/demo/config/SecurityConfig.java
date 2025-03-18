@@ -32,11 +32,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(request->request
                         .requestMatchers("api/user/create","api/user/login").permitAll()
                         .requestMatchers("api/admin/create","api/admin/login").permitAll()
-                        .requestMatchers("/api/admin").hasAuthority("ADMIN") // Acces doar pentru admini
+                        .requestMatchers("/api/admin").hasAuthority("ADMIN")
                         .requestMatchers("/api/user").hasAuthority("USER")
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults()) //for Postman
-                //.formLogin(Customizer.withDefaults()) //for browser
                 .sessionManagement(session->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))//new session id for postman that works
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
@@ -69,8 +68,6 @@ public class SecurityConfig {
                 .build();
         return new InMemoryUserDetailsManager(user1,user2);//nu verifica autentificarea
     }*/
-
-
     //AuthenticationObject(un-authenticated) -> AuthenticationProvider -> AuthenticationObject(authenticated)
     //folosit ca sa ma leg la baza de date
     @Bean
@@ -85,6 +82,4 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
-
-
 }
