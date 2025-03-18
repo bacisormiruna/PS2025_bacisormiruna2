@@ -6,12 +6,21 @@ import com.example.demo.dto.userdto.UserDTO;
 import com.example.demo.dto.userdto.UserViewDTO;
 import com.example.demo.entity.Role;
 import com.example.demo.entity.User;
+import com.example.demo.entity.UserPrincipal;
 import com.example.demo.errorhandler.UserException;
 import com.example.demo.repository.RoleRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.validator.UserFieldValidator;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -22,11 +31,16 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class UserService {
+public class UserService{
 
     private final RoleRepository roleRepository;
-
     private final UserRepository userRepository;
+    private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
+    @Autowired
+    private AuthenticationManager authenticationManager;
+    @Autowired
+    private JWTService jwtService;
+
 
     public List<UserViewDTO> findAllUserView() {
 
@@ -74,6 +88,7 @@ public class UserService {
         }
 
         User userSave = UserBuilder.generateEntityFromDTO(userDTO, role.get());
+        userSave.setPassword(encoder.encode(userSave.getPassword()));
 
         return userRepository.save(userSave).getId();
     }
@@ -135,5 +150,22 @@ public class UserService {
         return  userList.stream()
                 .map(UserViewBuilder::generateDTOFromEntity)
                 .collect(Collectors.toList());
+    }
+
+    public String verify(UserDTO userDTO) {
+        Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(userDTO.getName(),userDTO.getPassword()));
+        if(authentication.isAuthenticated())
+            return jwtService.generatToken(userDTO.getName());
+        return "fail";
+    }
+
+
+    public void changeUserRole(Long id, String roleName) throws UserException {
+        User user = userRepository.findById(id).orElseThrow(() -> new UserException("User not found"));
+
+        // Verificăm dacă rolul este valid (optional, dacă ai o entitate de rol)
+        Role role = roleRepository.findRoleByName(roleName).orElseThrow(() -> new UserException("Role not found"));
+        user.setRole(role);
+        userRepository.save(user);
     }
 }

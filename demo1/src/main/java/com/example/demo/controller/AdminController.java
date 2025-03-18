@@ -1,8 +1,6 @@
 package com.example.demo.controller;
 
-
 import com.example.demo.dto.userdto.UserDTO;
-import com.example.demo.entity.User;
 import com.example.demo.errorhandler.UserException;
 import com.example.demo.service.UserService;
 import lombok.NonNull;
@@ -14,10 +12,9 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @CrossOrigin
-@RequestMapping(value = "/api/user")
+@RequestMapping(value = "/api/admin")
 @RequiredArgsConstructor
-public class UserController {
-
+public class AdminController{
     private final UserService userService;
 
     @RequestMapping(value = "/getAll", method = RequestMethod.GET)
@@ -26,7 +23,7 @@ public class UserController {
     }
 
     @RequestMapping(value = "/getUserById/{id}", method = RequestMethod.GET)
-    public ResponseEntity<?> displayUserViewById(@PathVariable("id") @NonNull  Long id) throws UserException {
+    public ResponseEntity<?> displayUserViewById(@PathVariable("id") @NonNull Long id) throws UserException {
         return new ResponseEntity<>(userService.findUserViewById(id), HttpStatus.OK);
     }
 
@@ -60,6 +57,9 @@ public class UserController {
         userService.deleteUser(id);
         return new ResponseEntity<>(HttpStatus.OK);
     }
-
-
+    @RequestMapping(value="/changeRole/{id}/{role}", method = RequestMethod.PUT)
+    public ResponseEntity<?> changeUserRole(@PathVariable("id") Long id, @PathVariable("role") String role) throws UserException {
+        userService.changeUserRole(id, role);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
 }
