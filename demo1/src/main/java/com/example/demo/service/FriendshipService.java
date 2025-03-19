@@ -29,6 +29,11 @@ public class FriendshipService {
         User sender = userRepository.findById(senderId).orElseThrow(() -> new RuntimeException("Sender not found"));
         User receiver = userRepository.findById(receiverId).orElseThrow(() -> new RuntimeException("Receiver not found"));
 
+
+        if (sender.getFriends().contains(receiver)) {
+            throw new IllegalArgumentException("You are already friends");
+        }
+
         //vreau sa verific daca exista deja o cerere de prietenie in asteptare
         Optional<Friendship> exists = friendshipRepository.findBySenderAndReceiverAndStatus(sender,receiver,Friendship.RequestStatus.PENDING);
         if (exists.isPresent()) {
@@ -53,13 +58,9 @@ public class FriendshipService {
         System.out.println("Friend request sent successfully");
     }
 
-    public void acceptFriendRequest(Long requestId, Long userId) {
-        Friendship friendship = friendshipRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
-
-        if (!friendship.getReceiver().getId().equals(userId)) {
-            throw new RuntimeException("You are not authorized to accept this request");
-        }
+    public void acceptFriendRequest(Long senderId, Long userId) {
+        Friendship friendship = friendshipRepository.findBySenderIdAndReceiverId(senderId, userId)
+                .orElseThrow(() -> new RuntimeException("Friend request not found"));
 
         if (friendship.getStatus() == Friendship.RequestStatus.ACCEPTED) {
             throw new RuntimeException("You are already friends");
@@ -82,13 +83,9 @@ public class FriendshipService {
         System.out.println("Friend request accepted successfully");
     }
 
-    public void rejectFriendRequest(Long requestId, Long userId) {
-        Friendship friendship = friendshipRepository.findById(requestId)
-                .orElseThrow(() -> new RuntimeException("Request not found"));
-
-        if (!friendship.getReceiver().getId().equals(userId)) {
-            throw new RuntimeException("You are not authorized to reject this request");
-        }
+    public void rejectFriendRequest(Long senderId, Long userId) {
+        Friendship friendship = friendshipRepository.findBySenderIdAndReceiverId(senderId, userId)
+                .orElseThrow(() -> new RuntimeException("Friend request not found"));
 
         if (friendship.getStatus() == Friendship.RequestStatus.ACCEPTED) {
             throw new RuntimeException("You cannot reject an accepted request!");
@@ -102,7 +99,7 @@ public class FriendshipService {
         System.out.println("Friend request rejected");
     }
 
-
+    
     public List<FriendDTO> getFriends(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         return user.getFriends().stream()
