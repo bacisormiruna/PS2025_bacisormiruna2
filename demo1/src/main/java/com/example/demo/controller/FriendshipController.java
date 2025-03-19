@@ -26,7 +26,7 @@ public class FriendshipController {
     }
 
     @PreAuthorize("isAuthenticated()")
-    @PutMapping("/accept/{sendertId}")
+    @PutMapping("/accept/{senderId}")
     public ResponseEntity<?> acceptFriendRequest(@PathVariable Long senderId) {
         Long userId = friendshipService.getAuthenticatedUserId();
         friendshipService.acceptFriendRequest(senderId, userId);
