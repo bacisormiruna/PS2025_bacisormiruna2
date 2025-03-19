@@ -32,7 +32,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(request->request
                         .requestMatchers("api/user/create","api/user/login").permitAll()
                         .requestMatchers("api/admin/create","api/admin/login").permitAll()
-                        .requestMatchers("/api/admin").hasAuthority("ADMIN")
+                        .requestMatchers("/api/admin/changeRole/").hasAuthority("ADMIN")
                         .requestMatchers("/api/user").hasAuthority("USER")
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults()) //for Postman

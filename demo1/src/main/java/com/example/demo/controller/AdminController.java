@@ -45,7 +45,7 @@ public class AdminController{
 
     @RequestMapping(method = RequestMethod.POST, consumes = MediaType.APPLICATION_JSON_VALUE, value = "/login")
     public String loginForm(@RequestBody(required = false) UserDTO userDTO) throws UserException {
-        return userService.verify(userDTO);
+        return userService.verify2(userDTO);
     }
 
     @RequestMapping(method = RequestMethod.PUT, consumes = MediaType.APPLICATION_JSON_VALUE, value = "/update")

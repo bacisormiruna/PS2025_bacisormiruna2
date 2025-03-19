@@ -26,29 +26,30 @@ public class FriendshipController {
     }
 
     @PreAuthorize("isAuthenticated()")
-    @PutMapping("/accept/{requestId}")
-    public ResponseEntity<?> acceptFriendRequest(@PathVariable Long requestId) {
+    @PutMapping("/accept/{sendertId}")
+    public ResponseEntity<?> acceptFriendRequest(@PathVariable Long senderId) {
         Long userId = friendshipService.getAuthenticatedUserId();
-        friendshipService.acceptFriendRequest(requestId, userId);
+        friendshipService.acceptFriendRequest(senderId, userId);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @PreAuthorize("isAuthenticated()")
-    @PutMapping("/reject/{requestId}")
-    public ResponseEntity<?> rejectFriendRequest(@PathVariable Long requestId) {
+    @PutMapping("/reject/{senderId}")
+    public ResponseEntity<?> rejectFriendRequest(@PathVariable Long senderId) {
        Long userId = friendshipService.getAuthenticatedUserId();
-       friendshipService.rejectFriendRequest(requestId, userId);
+       friendshipService.rejectFriendRequest(senderId, userId);
        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @PreAuthorize("isAuthenticated()")
-    @GetMapping("/friends/{userId}")
-    public ResponseEntity<List<FriendDTO>> getFriends(@PathVariable Long userId) {
+    @GetMapping("/friends")
+    public ResponseEntity<List<FriendDTO>> getFriends() {
+        Long userId = friendshipService.getAuthenticatedUserId();
         List<FriendDTO> friends = friendshipService.getFriends(userId);
         return new ResponseEntity<>(friends, HttpStatus.OK);
     }
 
-    @PreAuthorize("isAuthenticated()") // Permite accesul doar utilizatorilor autentificați
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/requests")
     public List<FriendDTO> getFriendshipRequests() {
         return friendshipService.getFriendshipRequests();

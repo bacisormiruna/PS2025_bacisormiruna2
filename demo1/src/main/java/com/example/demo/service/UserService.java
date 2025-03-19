@@ -159,6 +159,21 @@ public class UserService{
         return "fail";
     }
 
+    public String verify2(UserDTO userDTO) throws UserException {
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(userDTO.getName(), userDTO.getPassword())
+        );
+
+        if (!authentication.isAuthenticated()) {
+            throw new UserException("Login failed. Invalid credentials.");
+        }
+        User user = userRepository.findByName(userDTO.getName());
+        if (!"ADMIN".equalsIgnoreCase(user.getRole().getName())) {
+            throw new UserException("Access denied. Only admins can log in.");
+        }
+        return jwtService.generatToken(userDTO.getName());
+    }
+
 
     public void changeUserRole(Long id, String roleName) throws UserException {
         User user = userRepository.findById(id).orElseThrow(() -> new UserException("User not found"));
