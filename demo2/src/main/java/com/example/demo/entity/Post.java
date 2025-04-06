@@ -1,5 +1,6 @@
 package com.example.demo.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -36,19 +37,27 @@ public class Post {
 
     @ManyToMany
     @JoinTable(
-            name = "post_hashtags",
+            name = "post_hashtag",
             joinColumns = @JoinColumn(name = "post_id"),
             inverseJoinColumns = @JoinColumn(name = "hashtag_id")
     )
-    private Set<Hashtag> hashtags = new HashSet<>();
+    @JsonManagedReference
+    private Set<Hashtag> hashtags;
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Comment> comments = new ArrayList<>();
+
+    @PreRemove
+    private void removeHashtagsFromPosts() {
+        for (Hashtag hashtag : hashtags) {
+            hashtag.getPosts().remove(this);
+        }
+    }
 
     @PreUpdate
     public void preUpdate() {

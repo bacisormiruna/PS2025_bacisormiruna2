@@ -6,6 +6,7 @@ import com.example.demo.service.PostService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Set;
@@ -21,15 +22,18 @@ public class PostController {
         this.postService = postService;
     }
 
-    @PostMapping
+    @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<Post> createPost(
             @RequestParam Long authorId,
             @RequestParam String content,
-            @RequestParam(required = false) String imageUrl,
-            @RequestParam Set<String> hashtags) {
-        Post post = postService.createPost(authorId, content, imageUrl, hashtags);
+            @RequestParam(required = false) MultipartFile image,
+            @RequestParam Set<String> hashtags
+    ) {
+        String imageUrl = postService.storeImage(image); // Metodă nouă care salvează imaginea și returnează URL-ul
+        Post post = postService.addPost(authorId, content, imageUrl, hashtags);
         return ResponseEntity.ok(post);
     }
+
 
     @PutMapping("/{postId}")
     public ResponseEntity<Post> updatePost(
@@ -68,3 +72,4 @@ public class PostController {
         return ResponseEntity.ok(postService.getPostsByUser(authorId));
     }
 }
+

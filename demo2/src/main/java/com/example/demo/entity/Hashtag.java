@@ -1,5 +1,6 @@
 package com.example.demo.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -25,7 +26,9 @@ public class Hashtag {
     private String name;
 
     @ManyToMany(mappedBy = "hashtags")
-    private Set<Post> posts = new HashSet<>();
+    @JsonBackReference
+    private Set<Post> posts;
+
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -44,13 +47,12 @@ public class Hashtag {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Hashtag hashtag = (Hashtag) o;
-        return name.equalsIgnoreCase(hashtag.name);
+        if (!(o instanceof Hashtag)) return false;
+        return id != null && id.equals(((Hashtag) o).id);
     }
 
     @Override
     public int hashCode() {
-        return name.toLowerCase().hashCode();
+        return getClass().hashCode();
     }
 }

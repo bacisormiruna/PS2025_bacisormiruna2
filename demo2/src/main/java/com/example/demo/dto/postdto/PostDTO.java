@@ -15,11 +15,20 @@ import java.util.Set;
 @AllArgsConstructor
 public class PostDTO {
     private Long id;
-    private Long userId;
+    private Long authorId;
     private String content;
     private String imageUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Set<String> hashtags;
     private Integer commentCount;
+
+    public PostDTO(Long id, Long authorId, String content, String imageUrl, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.id=id;
+        this.authorId= authorId;
+        this.content=content;
+        this.imageUrl=imageUrl;
+        this.createdAt=createdAt;
+        this.updatedAt=updatedAt;
+    }
 }
