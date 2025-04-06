@@ -51,7 +51,7 @@ public class UserService{
 
     public UserViewDTO findUserViewById(Long id) throws UserException {
 
-        Optional<User> user  = userRepository.findById(id);
+        Optional<User> user = userRepository.findById(id);
 
         if (user.isEmpty()) {
             throw new UserException("User not found with id field: " + id);
@@ -60,7 +60,7 @@ public class UserService{
     }
 
     public UserViewDTO findUserViewByEmail(String email) throws UserException {
-        Optional<User> user  = userRepository.findUserByEmail(email);
+        Optional<User> user = userRepository.findUserByEmail(email);
 
         if (user.isEmpty()) {
             throw new UserException("User not found with email field: " + email);
@@ -107,13 +107,10 @@ public class UserService{
         if (role.isEmpty()) {
             throw new UserException("Role not found with name field: " + userDTO.getRoleName().toUpperCase());
         }
-
         Optional<User> user = userRepository.findById(userDTO.getId());
         if(user.isEmpty()){
             throw new UserException("User not found with id field: " + userDTO.getId());
         }
-
-
         if(!user.get().getEmail().equals(userDTO.getEmail()))
         {
             Optional<User> verifyDuplicated = userRepository.findUserByEmail(userDTO.getEmail());
@@ -121,7 +118,6 @@ public class UserService{
                 throw new UserException("User record does not permit duplicates for email field: " + userDTO.getEmail());
             }
         }
-
         user.get().setName(userDTO.getName());
         user.get().setEmail(userDTO.getEmail());
         user.get().setPassword(userDTO.getPassword());
@@ -137,7 +133,6 @@ public class UserService{
         if (user.isEmpty()) {
             throw new UserException("User not found with id field: " + id);
         }
-
         this.userRepository.deleteById(id);
     }
 

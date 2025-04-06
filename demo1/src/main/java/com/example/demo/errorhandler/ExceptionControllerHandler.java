@@ -21,6 +21,12 @@ public class ExceptionControllerHandler {
         return createHttpResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
+    @ExceptionHandler(FriendshipException.class)
+    public ResponseEntity<HttpErrorResponse> friendshipException(FriendshipException exception) {
+        LOGGER.error(exception.getMessage());
+        return createHttpResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
     private ResponseEntity<HttpErrorResponse> createHttpResponse(HttpStatus httpStatus, String message){
         HttpErrorResponse httpErrorResponse = HttpErrorResponse.builder()
                 .timeStamp(LocalDateTime.now())

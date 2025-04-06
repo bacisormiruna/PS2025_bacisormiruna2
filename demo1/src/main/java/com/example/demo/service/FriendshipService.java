@@ -2,14 +2,16 @@ package com.example.demo.service;
 
 import com.example.demo.dto.frienddto.FriendDTO;
 import com.example.demo.entity.Friendship;
+import com.example.demo.entity.RequestStatus;
 import com.example.demo.entity.User;
+import com.example.demo.errorhandler.FriendshipException;
+import com.example.demo.errorhandler.UserException;
 import com.example.demo.repository.FriendshipRepository;
 import com.example.demo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -22,29 +24,32 @@ public class FriendshipService {
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
 
-    public void sendFriendRequest(Long senderId, Long receiverId) {
+    public void sendFriendRequest(Long senderId, Long receiverId) throws FriendshipException, UserException {
         if (senderId.equals(receiverId)) {
-            throw new IllegalArgumentException("You cannot send a friend request to yourself");
+            throw new FriendshipException("You cannot send a friend request to yourself");
         }
-        User sender = userRepository.findById(senderId).orElseThrow(() -> new RuntimeException("Sender not found"));
-        User receiver = userRepository.findById(receiverId).orElseThrow(() -> new RuntimeException("Receiver not found"));
 
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new UserException("Sender not found"));
+        User receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new UserException("Receiver not found"));
 
         if (sender.getFriends().contains(receiver)) {
-            throw new IllegalArgumentException("You are already friends");
+            throw new FriendshipException("You are already friends");
         }
 
-        //vreau sa verific daca exista deja o cerere de prietenie in asteptare
-        Optional<Friendship> exists = friendshipRepository.findBySenderAndReceiverAndStatus(sender,receiver,Friendship.RequestStatus.PENDING);
+        //verifică dacă există deja o cerere de prietenie în așteptare
+        Optional<Friendship> exists = friendshipRepository.findBySenderAndReceiverAndStatus(sender, receiver, RequestStatus.PENDING);
         if (exists.isPresent()) {
-            throw new IllegalArgumentException("Friend request already sent");
+            throw new FriendshipException("Friend request already sent");
         }
 
-        Optional<Friendship> exists2 = friendshipRepository.findBySenderAndReceiverAndStatus(sender,receiver,Friendship.RequestStatus.ACCEPTED);
+        Optional<Friendship> exists2 = friendshipRepository.findBySenderAndReceiverAndStatus(sender, receiver, RequestStatus.ACCEPTED);
         if (exists2.isPresent()) {
-            throw new IllegalArgumentException("You are already friends");
+            throw new FriendshipException("You are already friends");
         }
-        Optional<Friendship> rejectedExists = friendshipRepository.findBySenderAndReceiverAndStatus(sender, receiver, Friendship.RequestStatus.REJECTED);
+
+        Optional<Friendship> rejectedExists = friendshipRepository.findBySenderAndReceiverAndStatus(sender, receiver, RequestStatus.REJECTED);
         if (rejectedExists.isPresent()) {
             friendshipRepository.delete(rejectedExists.get());
         }
@@ -52,24 +57,24 @@ public class FriendshipService {
         Friendship request = new Friendship();
         request.setSender(sender);
         request.setReceiver(receiver);
-        request.setStatus(Friendship.RequestStatus.PENDING);
+        request.setStatus(RequestStatus.PENDING);
 
         friendshipRepository.save(request);
         System.out.println("Friend request sent successfully");
     }
 
-    public void acceptFriendRequest(Long senderId, Long userId) {
+    public void acceptFriendRequest(Long senderId, Long userId) throws FriendshipException {
         Friendship friendship = friendshipRepository.findBySenderIdAndReceiverId(senderId, userId)
-                .orElseThrow(() -> new RuntimeException("Friend request not found"));
+                .orElseThrow(() -> new FriendshipException("Friend request not found"));
 
-        if (friendship.getStatus() == Friendship.RequestStatus.ACCEPTED) {
-            throw new RuntimeException("You are already friends");
+        if (friendship.getStatus().equals(RequestStatus.ACCEPTED)) {
+            throw new FriendshipException("You are already friends");
         }
-        if (friendship.getStatus() == Friendship.RequestStatus.REJECTED) {
-            throw new RuntimeException("You cannot accept a rejected request!");
+        if (friendship.getStatus().equals(RequestStatus.REJECTED)) {
+            throw new FriendshipException("You cannot accept a rejected request!");
         }
 
-        friendship.setStatus(Friendship.RequestStatus.ACCEPTED);
+        friendship.setStatus(RequestStatus.ACCEPTED);
         friendshipRepository.save(friendship);
 
         User sender = friendship.getSender();
@@ -83,53 +88,53 @@ public class FriendshipService {
         System.out.println("Friend request accepted successfully");
     }
 
-    public void rejectFriendRequest(Long senderId, Long userId) {
+    public void rejectFriendRequest(Long senderId, Long userId) throws FriendshipException {
         Friendship friendship = friendshipRepository.findBySenderIdAndReceiverId(senderId, userId)
-                .orElseThrow(() -> new RuntimeException("Friend request not found"));
+                .orElseThrow(() -> new FriendshipException("Friend request not found"));
 
-        if (friendship.getStatus() == Friendship.RequestStatus.ACCEPTED) {
-            throw new RuntimeException("You cannot reject an accepted request!");
+        if (friendship.getStatus().equals(RequestStatus.ACCEPTED)) {
+            throw new FriendshipException("You cannot reject an accepted request!");
         }
-        if (friendship.getStatus() == Friendship.RequestStatus.REJECTED) {
-            throw new RuntimeException("You already rejected this request!");
+        if (friendship.getStatus().equals(RequestStatus.REJECTED)) {
+            throw new FriendshipException("You already rejected this request!");
         }
 
-        friendship.setStatus(Friendship.RequestStatus.REJECTED);
+        friendship.setStatus(RequestStatus.REJECTED);
         friendshipRepository.save(friendship);
         System.out.println("Friend request rejected");
     }
 
-    
-    public List<FriendDTO> getFriends(Long userId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+    public List<FriendDTO> getFriends(Long userId) throws UserException {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserException("User not found"));
+
         return user.getFriends().stream()
                 .map(friend -> new FriendDTO(friend.getId(), friend.getName(), "ACCEPTED"))
                 .collect(Collectors.toList());
     }
 
-    public Long getAuthenticatedUserId() {
+    public Long getAuthenticatedUserId() throws UserException {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (principal instanceof UserDetails) {
             String username = ((UserDetails) principal).getUsername();
             User user = userRepository.findByName(username);
             return user.getId();
         }
-        throw new RuntimeException("User not authenticated");
+        throw new UserException("User not authenticated");
     }
 
-
-    public List<FriendDTO> getFriendshipRequests() {
+    public List<FriendDTO> getFriendshipRequests() throws UserException {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (!(principal instanceof UserDetails)) {
-            throw new RuntimeException("User not authenticated");
+            throw new UserException("User not authenticated");
         }
 
         String username = ((UserDetails) principal).getUsername();
         User user = userRepository.findByName(username);
 
-        List<Friendship> pendingRequests = friendshipRepository.findByReceiverAndStatus(user, Friendship.RequestStatus.PENDING);
-        List<Friendship> acceptedRequests = friendshipRepository.findByReceiverAndStatus(user, Friendship.RequestStatus.ACCEPTED);
-        List<Friendship> rejectedRequests = friendshipRepository.findByReceiverAndStatus(user, Friendship.RequestStatus.REJECTED);
+        List<Friendship> pendingRequests = friendshipRepository.findByReceiverAndStatus(user, RequestStatus.PENDING);
+        List<Friendship> acceptedRequests = friendshipRepository.findByReceiverAndStatus(user, RequestStatus.ACCEPTED);
+        List<Friendship> rejectedRequests = friendshipRepository.findByReceiverAndStatus(user, RequestStatus.REJECTED);
 
         List<FriendDTO> friendDTOs = new ArrayList<>();
         pendingRequests.forEach(request ->

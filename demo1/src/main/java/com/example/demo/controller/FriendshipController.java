@@ -1,6 +1,8 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.frienddto.FriendDTO;
+import com.example.demo.errorhandler.FriendshipException;
+import com.example.demo.errorhandler.UserException;
 import com.example.demo.service.FriendshipService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,7 +21,7 @@ public class FriendshipController {
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/send/{receiverId}")
-    public ResponseEntity<?> sendFriendRequest(@PathVariable Long receiverId) {
+    public ResponseEntity<?> sendFriendRequest(@PathVariable Long receiverId) throws UserException, FriendshipException {
         Long senderId = friendshipService.getAuthenticatedUserId();
         friendshipService.sendFriendRequest(senderId, receiverId);
         return new ResponseEntity<>(HttpStatus.CREATED);
@@ -27,7 +29,7 @@ public class FriendshipController {
 
     @PreAuthorize("isAuthenticated()")
     @PutMapping("/accept/{senderId}")
-    public ResponseEntity<?> acceptFriendRequest(@PathVariable Long senderId) {
+    public ResponseEntity<?> acceptFriendRequest(@PathVariable Long senderId) throws UserException, FriendshipException {
         Long userId = friendshipService.getAuthenticatedUserId();
         friendshipService.acceptFriendRequest(senderId, userId);
         return new ResponseEntity<>(HttpStatus.OK);
@@ -35,15 +37,15 @@ public class FriendshipController {
 
     @PreAuthorize("isAuthenticated()")
     @PutMapping("/reject/{senderId}")
-    public ResponseEntity<?> rejectFriendRequest(@PathVariable Long senderId) {
-       Long userId = friendshipService.getAuthenticatedUserId();
-       friendshipService.rejectFriendRequest(senderId, userId);
-       return new ResponseEntity<>(HttpStatus.OK);
+    public ResponseEntity<?> rejectFriendRequest(@PathVariable Long senderId) throws UserException, FriendshipException {
+        Long userId = friendshipService.getAuthenticatedUserId();
+        friendshipService.rejectFriendRequest(senderId, userId);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/friends")
-    public ResponseEntity<List<FriendDTO>> getFriends() {
+    public ResponseEntity<List<FriendDTO>> getFriends() throws UserException {
         Long userId = friendshipService.getAuthenticatedUserId();
         List<FriendDTO> friends = friendshipService.getFriends(userId);
         return new ResponseEntity<>(friends, HttpStatus.OK);
@@ -51,7 +53,8 @@ public class FriendshipController {
 
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/requests")
-    public List<FriendDTO> getFriendshipRequests() {
-        return friendshipService.getFriendshipRequests();
+    public ResponseEntity<List<FriendDTO>> getFriendshipRequests() throws UserException {
+        List<FriendDTO> requests = friendshipService.getFriendshipRequests();
+        return new ResponseEntity<>(requests, HttpStatus.OK);
     }
 }

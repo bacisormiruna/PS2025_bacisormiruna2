@@ -26,10 +26,4 @@ public class Friendship {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RequestStatus status;
-
-    public enum RequestStatus {
-        ACCEPTED,
-        REJECTED,
-        PENDING
-    }
 }
