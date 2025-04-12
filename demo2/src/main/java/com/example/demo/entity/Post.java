@@ -1,56 +1,62 @@
 package com.example.demo.entity;
 
+import com.example.demo.dto.commentdto.CommentDTO;
+import com.example.demo.dto.hashtagdto.HashtagDTO;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 @Entity
 @Table(name = "posts")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Post {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private Long authorId; // ID din microserviciul de autentificare
+    @Column(name = "author_id", nullable = false)
+    private Long authorId;
 
-    @Column(nullable = false, length = 1000)
+    @Column(name = "content")
     private String content;
 
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "image_url")
     private String imageUrl;
 
-    @Column(nullable = false)
-    private boolean isPublic = false;
+    @Column(name = "is_public")
+    private Boolean isPublic = true;
 
-    @ManyToMany
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Lob
+    @Column(name = "image",columnDefinition = "LONGBLOB")
+    private byte[] image;
+
+    @Column(nullable = false)
+    private String username;
+
+    @ManyToMany(cascade = {CascadeType.ALL})
     @JoinTable(
             name = "post_hashtag",
             joinColumns = @JoinColumn(name = "post_id"),
             inverseJoinColumns = @JoinColumn(name = "hashtag_id")
     )
-    @JsonManagedReference
-    private Set<Hashtag> hashtags;
+    private Set<Hashtag> hashtags = new HashSet<>();
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
-
-    private LocalDateTime updatedAt;
-
-    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Comment> comments = new ArrayList<>();
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Comment> comments;
 
     @PreRemove
     private void removeHashtagsFromPosts() {

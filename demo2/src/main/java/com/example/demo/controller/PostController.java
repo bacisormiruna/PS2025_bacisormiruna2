@@ -1,75 +1,155 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.hashtagdto.HashtagDTO;
 import com.example.demo.dto.postdto.PostDTO;
-import com.example.demo.entity.Post;
+import com.example.demo.entity.Hashtag;
+import com.example.demo.errorhandler.PostNotFoundException;
+import com.example.demo.errorhandler.UnauthorizedException;
+import com.example.demo.service.JWTService;
 import com.example.demo.service.PostService;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.Set;
 
-// PostController.java
 @RestController
 @RequestMapping("/api/posts")
 public class PostController {
-    private final PostService postService;
 
     @Autowired
-    public PostController(PostService postService) {
-        this.postService = postService;
+    private PostService postService;
+    @Autowired
+    private JWTService jwtService;
+
+    @GetMapping
+    public ResponseEntity<List<PostDTO>> getAllPosts(HttpServletRequest request) {
+        List<PostDTO> posts = postService.getAllPosts();
+        System.out.println("Posts in controller: " + posts.size()); // Log pentru a verifica lista returnată
+        return ResponseEntity.ok(posts);
     }
 
-    @PostMapping(consumes = "multipart/form-data")
-    public ResponseEntity<Post> createPost(
-            @RequestParam Long authorId,
-            @RequestParam String content,
-            @RequestParam(required = false) MultipartFile image,
-            @RequestParam Set<String> hashtags
-    ) {
-        String imageUrl = postService.storeImage(image); // Metodă nouă care salvează imaginea și returnează URL-ul
-        Post post = postService.addPost(authorId, content, imageUrl, hashtags);
-        return ResponseEntity.ok(post);
+    //asta e buna pentru varianta clasica primul request de create1
+//    @PostMapping
+//    public ResponseEntity<PostDTO> createPost(
+//            @RequestPart("postDto") PostDTO postDto,
+//            @RequestPart("image") MultipartFile imageFile) throws Exception {
+//        PostDTO savedPost = postService.createPost(postDto, imageFile);
+//        return ResponseEntity.ok(savedPost);
+//    }
+
+    // Endpoint pentru crearea unei postări
+//    @PostMapping
+//    public ResponseEntity<PostDTO> createPost(@RequestBody PostDTO postDTO,
+//                                              @RequestParam(value = "image", required = false) MultipartFile imageFile) throws Exception {
+//        PostDTO createdPost = postService.createPost1(1L, postDTO, imageFile); // presupunem că userId = 1L
+//        return ResponseEntity.ok(createdPost);
+//    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<PostDTO> createPost(
+            @RequestPart("postDto") String postDtoJson,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) throws Exception {
+
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.registerModule(new JavaTimeModule());
+            objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+            PostDTO postDTO = objectMapper.readValue(postDtoJson, PostDTO.class);
+
+            // Extract userId from security context or from postDTO
+            //Long userId = postDTO.getAuthorId() != null ?
+            //        postDTO.getAuthorId() : getUserIdFromUsername(postDTO.getUsername());
+
+            // Create the post
+            PostDTO createdPost = postService.createPost1(postDTO, imageFile);
+            System.out.println("Hashtags for the post: " + createdPost.getHashtags());
+            return ResponseEntity.ok(createdPost);
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Error creating post: " + e.getMessage());
+        }
     }
 
 
-    @PutMapping("/{postId}")
-    public ResponseEntity<Post> updatePost(
+    @PutMapping(value = "/{postId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<PostDTO> updatePost(
             @PathVariable Long postId,
-            @RequestParam Long authorId,
-            @RequestParam String content,
-            @RequestParam(required = false) String imageUrl,
-            @RequestParam Set<String> hashtags) {
-        Post updatedPost = postService.updatePost(postId, authorId, content, imageUrl, hashtags);
-        return ResponseEntity.ok(updatedPost);
+            @RequestPart("postDto") String postDtoJson,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) throws Exception {
+
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.registerModule(new JavaTimeModule());
+            objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+            PostDTO postDTO = objectMapper.readValue(postDtoJson, PostDTO.class);
+            //String username = principal.getName();
+            PostDTO updatedPost = postService.updatePost(postId, postDTO, postDTO.getUsername(), imageFile);
+            System.out.println("Updated post with hashtags: " + updatedPost.getHashtags());
+
+            return ResponseEntity.ok(updatedPost);
+
+        } catch (PostNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (UnauthorizedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<PostDTO> getPostById(@PathVariable Long id) {
+        return ResponseEntity.ok(postService.getPostById(id));
     }
 
     @DeleteMapping("/{postId}")
-    public ResponseEntity<Void> deletePost(@PathVariable Long postId, @RequestParam Long authorId) {
-        postService.deletePost(postId, authorId);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<Void> deletePost(
+            @PathVariable Long postId,
+            @RequestParam String username) {//aici era Principal principal
+
+        try {
+            postService.deletePost(postId, username);
+            return ResponseEntity.noContent().build();
+
+        } catch (PostNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (UnauthorizedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
-    @GetMapping
-    public ResponseEntity<List<Post>> getAllPosts() {
-        return ResponseEntity.ok(postService.getAllPosts());
+    @GetMapping("/hashtag/{hashtagName}")
+    public ResponseEntity<List<PostDTO>> getPostsByHashtag(@PathVariable String hashtagName) {
+        return ResponseEntity.ok(postService.getPostsByHashtag(hashtagName));
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<Post>> searchPosts(@RequestParam String keyword) {
-        return ResponseEntity.ok(postService.searchPosts(keyword));
+    public ResponseEntity<List<PostDTO>> searchPosts(@RequestParam String query) {
+        return ResponseEntity.ok(postService.searchPosts(query));
     }
 
-    @GetMapping("/hashtag/{hashtag}")
-    public ResponseEntity<List<Post>> getPostsByHashtag(@PathVariable String hashtag) {
-        return ResponseEntity.ok(postService.getPostsByHashtag(hashtag));
-    }
-
-    @GetMapping("/user/{authorId}")
-    public ResponseEntity<List<Post>> getPostsByUser(@PathVariable Long authorId) {
-        return ResponseEntity.ok(postService.getPostsByUser(authorId));
+    @GetMapping("/user/{username}")
+    public ResponseEntity<List<PostDTO>> getPostsByUsername(@PathVariable String username) {
+        return ResponseEntity.ok(postService.getPostsByUsername(username));
     }
 }
-

@@ -30,10 +30,11 @@ public class SecurityConfig {
         return http
                 .csrf(customizer -> customizer.disable()) //daca facem sesiunile stateless, nu mai avem nevoie de csrf
                 .authorizeHttpRequests(request->request
-                        .requestMatchers("api/user/create","api/user/login").permitAll()
-                        .requestMatchers("api/admin/create","api/admin/login").permitAll()
-                        .requestMatchers("/api/admin/changeRole/").hasAuthority("ADMIN")
-                        .requestMatchers("/api/user").hasAuthority("USER")
+                       // .requestMatchers("api/user/create","api/user/login").permitAll()
+                       // .requestMatchers("api/admin/create","api/admin/login").permitAll()
+                       // .requestMatchers("/api/admin/changeRole/").hasAuthority("ADMIN")
+                       // .requestMatchers("/api/user").hasAuthority("USER")
+                        .requestMatchers("/api/user/**").permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults()) //for Postman
                 .sessionManagement(session->

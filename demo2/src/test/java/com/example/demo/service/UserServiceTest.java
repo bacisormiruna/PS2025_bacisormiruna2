@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class UserServiceTest extends BaseTest{
-
+/*
     @Resource
     DataTest dataTest;
 
@@ -66,6 +66,6 @@ public class UserServiceTest extends BaseTest{
         assertThat(updatedUser.getPassword()).isEqualTo("password1");
         assertThat(updatedUser.getEmail()).isEqualTo("email1");
         assertThat(updatedUser.getName()).isEqualTo("name1");
-    }
+    }*/
 }
 

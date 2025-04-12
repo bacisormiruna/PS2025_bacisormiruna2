@@ -2,10 +2,7 @@ package com.example.demo.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -13,8 +10,7 @@ import java.util.Set;
 
 @Entity
 @Table(name = "hashtags")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Hashtag {
@@ -22,28 +18,26 @@ public class Hashtag {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, unique = true)
     private String name;
 
     @ManyToMany(mappedBy = "hashtags")
     @JsonBackReference
-    private Set<Post> posts;
-
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
-
-    private LocalDateTime updatedAt;
+    private Set<Post> posts = new HashSet<>();
 
     public Hashtag(String name) {
         this.name = name;
     }
 
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
+    public Hashtag(Long id, String name) {
+        this.id=id;
+        this.name=name;
     }
 
+    @Override
+    public String toString() {
+        return "Hashtag{id=" + id + ", name='" + name + "'}";
+    }
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

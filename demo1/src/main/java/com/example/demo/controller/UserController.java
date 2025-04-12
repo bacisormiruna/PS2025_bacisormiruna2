@@ -1,16 +1,29 @@
 package com.example.demo.controller;
 
-
+import com.example.demo.dto.hashtagdto.HashtagDTO;
+import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.dto.userdto.UserDTO;
-import com.example.demo.entity.User;
 import com.example.demo.errorhandler.UserException;
+import com.example.demo.service.JWTService;
 import com.example.demo.service.UserService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @RestController
 @CrossOrigin
@@ -19,6 +32,8 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final WebClient webClientBuilder;
+    private final JWTService jwtTokenProvider;
 
     @RequestMapping(value = "/getAll", method = RequestMethod.GET)
     public ResponseEntity<?> displayAllUserView(){
@@ -61,5 +76,23 @@ public class UserController {
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
+    @GetMapping("/demo2/posts")
+    public Flux<PostDTO> getPostsFromM2() {
+        return webClientBuilder
+                .get()
+                .uri("/api/posts")
+                .retrieve()
+                .bodyToFlux(PostDTO.class);
+    }
 
+    @PostMapping("/createPost")
+    public Mono<PostDTO> createPost(@RequestPart("postDto") PostDTO postDTO, @RequestPart("image") MultipartFile imageFile) throws UserException {
+        return webClientBuilder
+                .post()
+                .uri("/api/posts")
+                .body(BodyInserters.fromMultipartData("postDto",postDTO)
+                        .with("image", imageFile.getResource()))
+                .retrieve()
+                .bodyToMono(PostDTO.class);
+    }
 }

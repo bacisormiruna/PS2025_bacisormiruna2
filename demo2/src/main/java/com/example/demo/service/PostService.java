@@ -5,151 +5,233 @@ import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.entity.Hashtag;
 import com.example.demo.entity.Post;
 import com.example.demo.errorhandler.PostNotFoundException;
+import com.example.demo.errorhandler.UnauthorizedException;
+import com.example.demo.mapper.HashtagMapper;
+import com.example.demo.mapper.PostMapper;
 import com.example.demo.repository.HashtagRepository;
 import com.example.demo.repository.PostRepository;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class PostService {
-
-    private final PostRepository postRepository;
-    private final HashtagRepository hashtagRepository;
+    @Autowired
+    private PostRepository postRepository;
 
     @Autowired
-    public PostService(PostRepository postRepository, HashtagRepository hashtagRepository) {
-        this.postRepository = postRepository;
-        this.hashtagRepository = hashtagRepository;
+    private HashtagRepository hashtagRepository;
+
+    @Autowired
+    private PostMapper postMapper;
+    @Autowired
+    private HashtagService hashtagService;
+    @Autowired
+    private HashtagMapper hashtagMapper;
+
+    public List<PostDTO> getAllPosts() {
+        List<Post> posts = postRepository.findAllByOrderByCreatedAtDesc();
+        System.out.println("Found posts: " + posts.size()); // Log pentru a verifica câte postări sunt returnate
+        return posts.stream()
+                .map(postMapper::toDto)
+                .collect(Collectors.toList());
     }
 
-    @Transactional
-    public Post addPost(Long userId, String content, String imageUrl, Set<String> hashtags) {
-        Set<Hashtag> hashtagSet = new HashSet<>();
-        for (String hashtagName : hashtags) {
-            Hashtag hashtag = hashtagRepository.findByNameIgnoreCase(hashtagName)
-                    .orElseGet(() -> hashtagRepository.save(new Hashtag(hashtagName)));
-            hashtagSet.add(hashtag);
-        }
 
-        Post post = new Post();
-        post.setAuthorId(userId);
-        post.setContent(content);
-        post.setImageUrl(imageUrl);
-        post.setHashtags(hashtagSet);
+//    public PostDTO createPost1(Long userId, PostDTO postDto, MultipartFile imageFile) throws Exception {
+//        Post post = postMapper.toEntity(postDto);
+//        post.setCreatedAt(LocalDateTime.now());
+//        post.setAuthorId(userId);
+//
+//
+//        Set<Hashtag> hashtags = extractHashtags(postDto.getHashtags());
+//        System.out.println("Hashtags extrase: " +postDto.getHashtags());
+//        System.out.println("Hashtags extrase: " + hashtags);
+//
+//        post.setHashtags(hashtags);
+//        Post savedPost = postRepository.save(post);
+//
+//        if (imageFile != null && !imageFile.isEmpty()) {
+//            storeImage(savedPost.getId(), imageFile);
+//        }
+//        return postMapper.toDto(savedPost);
+//    }
+
+
+    @Transactional
+    public PostDTO createPost1(PostDTO postDto, MultipartFile imageFile) throws Exception {
+        Post post = postMapper.toEntity(postDto);
         post.setCreatedAt(LocalDateTime.now());
         post.setUpdatedAt(LocalDateTime.now());
+        if (postDto.getHashtags() != null && !postDto.getHashtags().isEmpty()) {
+            Set<Hashtag> hashtags = new HashSet<>();
 
-        return postRepository.save(post);
+            for (HashtagDTO hashtagDto : postDto.getHashtags()) {
+                String hashtagName = hashtagDto.getName();
+                if (hashtagName != null && !hashtagName.trim().isEmpty()) {
+                    Hashtag hashtag = hashtagService.findOrCreateHashtag(hashtagName);
+                    hashtags.add(hashtag);
+                }
+            }
+            post.setHashtags(hashtags);
+        }
+        Post savedPost = postRepository.save(post);
+        if (imageFile != null && !imageFile.isEmpty()) {
+            storeImage(savedPost.getId(), imageFile);
+        }
+        return postMapper.toDto(savedPost);
     }
 
-    //stergere
+    public PostDTO getPostById(Long id) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + id));
+        return postMapper.toDto(post);
+    }
+
+//    public PostDTO updatePost(Long id, PostDTO postDto, String username, MultipartFile imageFile) throws Exception {
+//        Post existingPost = postRepository.findById(id)
+//                .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + id));
+//        if (!existingPost.getUsername().equals(username)) {
+//            throw new UnauthorizedException("You can only update your own posts");
+//        }
+//        existingPost.setContent(postDto.getContent());
+//        if (postDto.getImageUrl() != null) {
+//            existingPost.setImageUrl(postDto.getImageUrl());
+//        }
+//        Set<Hashtag> hashtags = extractHashtags(postDto.getHashtags());
+//        existingPost.setHashtags(hashtags);
+//        Post updatedPost = postRepository.save(existingPost);
+//        if (imageFile != null && !imageFile.isEmpty()) {
+//            storeImage(updatedPost.getId(), imageFile);
+//        }
+//        return postMapper.toDto(updatedPost);
+//    }
+
     @Transactional
-    public void deletePost(Long postId, Long authorId) {
+    public PostDTO updatePost(Long postId, PostDTO postDto, String username, MultipartFile imageFile) throws Exception {
+        Post existingPost = postRepository.findById(postId)
+                .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
+
+        if (!existingPost.getUsername().equals(username)) {
+            throw new UnauthorizedException("You can only update your own posts");
+        }
+
+        existingPost.setContent(postDto.getContent());
+        existingPost.setUpdatedAt(LocalDateTime.now());
+        existingPost.setIsPublic(postDto.getIsPublic());
+
+        if (postDto.getHashtags() != null) {
+            Set<Hashtag> updatedHashtags = new HashSet<>();
+            for (HashtagDTO hashtagDto : postDto.getHashtags()) {
+                String hashtagName = hashtagDto.getName();
+                if (hashtagName != null && !hashtagName.trim().isEmpty()) {
+                    Hashtag hashtag = hashtagService.findOrCreateHashtag(hashtagName);
+                    updatedHashtags.add(hashtag);
+                }
+            }
+            existingPost.setHashtags(updatedHashtags);
+        } else {
+            existingPost.getHashtags().clear();
+        }
+        if (imageFile != null && !imageFile.isEmpty()) {
+            storeImage(existingPost.getId(), imageFile);
+        }
+        Post updatedPost = postRepository.save(existingPost);
+        return postMapper.toDto(updatedPost);
+    }
+
+    @Transactional
+    public void deletePost(Long postId, String username) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
 
-        if (!post.getAuthorId().equals(authorId)) {
-            throw new SecurityException("Only the author can delete this post");
+        if (!post.getUsername().equals(username)) {
+            throw new UnauthorizedException("You can only delete your own posts");
         }
+
+        post.getHashtags().clear();
+        postRepository.saveAndFlush(post);
+
         postRepository.delete(post);
     }
-    //actualizare
+
+    public List<PostDTO> getPostsByHashtag(String hashtagName) {
+        return postRepository.findByHashtagName(hashtagName).stream()
+                .map(postMapper::toDto)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
-    public Post updatePost(Long postId, Long authorId, String newContent, String newImageUrl, Set<String> hashtags) {
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
-
-        if (!post.getAuthorId().equals(authorId)) {
-            throw new SecurityException("Only the author can edit this post");
+    protected Set<Hashtag> extractHashtags(Set<HashtagDTO> hashtagsDTO) {
+        Set<Hashtag> hashtags = new HashSet<>();
+        if (hashtagsDTO == null) {
+            return hashtags;
         }
 
-        post.setContent(newContent);
-        post.setImageUrl(newImageUrl);
-        post.setUpdatedAt(LocalDateTime.now());
-        Set<Hashtag> hashtagSet = new HashSet<>();
-        for (String hashtagName : hashtags) {
-            Hashtag hashtag = hashtagRepository.findByNameIgnoreCase(hashtagName)
-                    .orElseGet(() -> hashtagRepository.save(new Hashtag(hashtagName)));
-            hashtagSet.add(hashtag);
+        for (HashtagDTO hashtagDTO : hashtagsDTO) {
+            String hashtagName = hashtagDTO.getName();
+            if (hashtagName == null || hashtagName.trim().isEmpty()) {
+                continue;
+            }
+            if (!hashtagName.startsWith("#")) {
+                hashtagName = "#" + hashtagName;
+            }
+
+            Hashtag hashtag = null;
+            try {
+                hashtag = hashtagRepository.findByName(hashtagName)
+                        .orElse(null);
+            } catch (Exception e) {
+                System.err.println("Error finding hashtag: " + e.getMessage());
+            }
+
+            if (hashtag == null) {
+                try {
+                    hashtag = new Hashtag();
+                    hashtag.setName(hashtagName);
+                    hashtag = hashtagRepository.save(hashtag);
+                    System.out.println("Created new hashtag with ID: " + hashtag.getId());
+                } catch (Exception e) {
+                    System.err.println("Error creating hashtag: " + e.getMessage());
+                    continue;
+                }
+            }
+            hashtags.add(hashtag);
         }
-        post.setHashtags(hashtagSet);
-        return postRepository.save(post);
-    }
-    //cautare
-    public List<Post> searchPosts(String keyword) {
-        return postRepository.findByContentContainingIgnoreCase(keyword);
+        return hashtags;
     }
 
-    //afisare
-    public List<Post> getAllPosts() {
-        return postRepository.findAll();
-    }
-
-    public List<Post> getPostsByUser(Long authorId) {
-        return postRepository.findByAuthorId(authorId);
-    }
-
-    public List<Post> getPostsByHashtag(String hashtag) {
-        return postRepository.findByHashtagsName(hashtag);
-    }
-
-    public List<PostDTO> getPostsByHashtagDTO(String hashtag) {
-        List<Post> posts = postRepository.findByHashtagsName(hashtag);
-        return posts.stream()
-                .map(post -> new PostDTO(post.getId(), post.getAuthorId(), post.getContent(), post.getImageUrl(), post.getCreatedAt(), post.getUpdatedAt()))
+    public List<PostDTO> searchPosts(String query) {
+        return postRepository.searchByText(query).stream()
+                .map(postMapper::toDto)
                 .collect(Collectors.toList());
     }
 
-    public List<HashtagDTO> getHashtagsByPostId(Long postId) {
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
-        return post.getHashtags().stream()
-                .map(hashtag -> new HashtagDTO(hashtag.getId(), hashtag.getName()))
+    public List<PostDTO> getPostsByUsername(String username) {
+        return postRepository.findByUsername(username).stream()
+                .map(postMapper::toDto)
                 .collect(Collectors.toList());
     }
 
-    public Post getPostById(Long postId) {
-        return postRepository.findById(postId)
+    @Transactional
+    public PostDTO storeImage(Long postId, MultipartFile imageFile) throws Exception {
+        Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
-    }
-
-    public List<Post> getPostsByAuthorId(Long authorId) {
-        return postRepository.findByAuthorId(authorId);
-    }
-
-    public List<Post> getPostsByHashtags(Set<String> hashtags) {
-        return postRepository.findByHashtagsNameIn(hashtags);
-    }
-    public List<Post> getPostsByContent(String content) {
-        return postRepository.findByContentContainingIgnoreCase(content);
-    }
-
-    public String storeImage(MultipartFile image) {
-        if (image == null || image.isEmpty()) return null;
-
-        try {
-            String filename = UUID.randomUUID() + "_" + image.getOriginalFilename();
-            Path imagePath = Paths.get("uploads/" + filename); // Creează un folder „uploads” în proiect
-            Files.createDirectories(imagePath.getParent());
-            Files.copy(image.getInputStream(), imagePath, StandardCopyOption.REPLACE_EXISTING);
-            return "/images/" + filename; // Poți face să servești aceste fișiere statice
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to store image", e);
-        }
+        byte[] imageData = imageFile.getBytes();
+        post.setImage(imageData);
+        //post.setImageUrl(imageUrl);//optional
+        Post updatedPost = postRepository.save(post);
+        return postMapper.toDto(updatedPost);
     }
 
 }

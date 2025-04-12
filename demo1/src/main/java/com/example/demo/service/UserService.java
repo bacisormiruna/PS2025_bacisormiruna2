@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -167,6 +168,26 @@ public class UserService{
             throw new UserException("Access denied. Only admins can log in.");
         }
         return jwtService.generatToken(userDTO.getName());
+    }
+
+    public Long getAuthenticatedUserId() throws UserException {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof UserDetails) {
+            String username = ((UserDetails) principal).getUsername();
+            User user = userRepository.findByName(username);
+            return user.getId();
+        }
+        throw new UserException("User not authenticated");
+    }
+
+    public String getAuthenticatedUsername() throws UserException {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof UserDetails) {
+            String username = ((UserDetails) principal).getUsername();
+            User user = userRepository.findByName(username);
+            return user.getName();
+        }
+        throw new UserException("User not authenticated");
     }
 
 

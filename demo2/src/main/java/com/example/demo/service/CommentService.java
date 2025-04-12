@@ -6,6 +6,8 @@ import com.example.demo.entity.Comment;
 import com.example.demo.entity.Post;
 import com.example.demo.errorhandler.CommentNotFoundException;
 import com.example.demo.errorhandler.PostNotFoundException;
+import com.example.demo.errorhandler.UnauthorizedException;
+import com.example.demo.mapper.CommentMapper;
 import com.example.demo.repository.CommentRepository;
 import com.example.demo.repository.PostRepository;
 import jakarta.transaction.Transactional;
@@ -13,67 +15,59 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 public class CommentService {
 
-    private final CommentRepository commentRepository;
-    private final PostRepository postRepository;
+    @Autowired
+    private CommentRepository commentRepository;
 
     @Autowired
-    public CommentService(CommentRepository commentRepository, PostRepository postRepository) {
-        this.commentRepository = commentRepository;
-        this.postRepository = postRepository;
-    }
+    private PostRepository postRepository;
 
-    // Adăugare comentariu
-    @Transactional
-    public Comment addComment(Long postId, Long userId, String content, String imageUrl) {
+    @Autowired
+    private CommentMapper commentMapper;
+
+    public CommentDTO addComment(Long postId, CommentDTO commentDto) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
+                .orElseThrow(() -> new CommentNotFoundException("Post not found with id: " + postId));
 
-        Comment comment = new Comment();
+        Comment comment = commentMapper.toEntity(commentDto);
+        comment.setPublishTime(LocalDateTime.now());
         comment.setPost(post);
-        comment.setAuthorId(userId);
-        comment.setContent(content);
-        comment.setImageUrl(imageUrl);
-        comment.setCreatedAt(LocalDateTime.now());
-        comment.setUpdatedAt(LocalDateTime.now());
 
-        return commentRepository.save(comment);
+        Comment savedComment = commentRepository.save(comment);
+        return commentMapper.toDto(savedComment);
     }
 
-    @Transactional
-    public Comment updateComment(Long commentId, Long authorId, String newContent, String newImageUrl) {
-        Comment comment = commentRepository.findById(commentId)
+    public CommentDTO updateComment(Long commentId, CommentDTO commentDto, String username) {
+        Comment existingComment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new CommentNotFoundException("Comment not found with id: " + commentId));
 
-        if (!comment.getAuthorId().equals(authorId)) {
-            throw new SecurityException("Only the author can edit this comment");
+        // Verifică dacă utilizatorul este autorul comentariului
+        if (!existingComment.getUsername().equals(username)) {
+            throw new UnauthorizedException("You can only update your own comments");
         }
 
-        comment.setContent(newContent);
-        comment.setImageUrl(newImageUrl);
-        comment.setUpdatedAt(LocalDateTime.now());
+        // Actualizează textul comentariului
+        existingComment.setContent(commentDto.getContent());
+        if (commentDto.getImageUrl() != null) {
+            existingComment.setImageUrl(commentDto.getImageUrl());
+        }
 
-        return commentRepository.save(comment);
+        Comment updatedComment = commentRepository.save(existingComment);
+        return commentMapper.toDto(updatedComment);
     }
 
-    // Ștergere comentariu
-    @Transactional
-    public void deleteComment(Long commentId, Long authorId) {
+    public void deleteComment(Long commentId, String username) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new CommentNotFoundException("Comment not found with id: " + commentId));
 
-        if (!comment.getAuthorId().equals(authorId)) {
-            throw new SecurityException("Only the author can delete this comment");
+        // Verifică dacă utilizatorul este autorul comentariului
+        if (!comment.getUsername().equals(username)) {
+            throw new UnauthorizedException("You can only delete your own comments");
         }
 
         commentRepository.delete(comment);
-    }
-
-    public List<Comment> getCommentsForPost(Long postId) {
-        return commentRepository.findByPostIdOrderByCreatedAtDesc(postId);
     }
 }

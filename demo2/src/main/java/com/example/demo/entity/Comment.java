@@ -1,18 +1,13 @@
 package com.example.demo.entity;
 
-import com.example.demo.dto.postdto.PostDTO;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "comments")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Comment {
@@ -20,25 +15,24 @@ public class Comment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", nullable = false)
-    private Post post;
-
     @Column(nullable = false)
-    private Long authorId; // ID din microserviciul de autentificare
-
-    @Column(nullable = false, length = 500)
     private String content;
 
     private String imageUrl;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime publishTime; // = createdAt în DTO
 
+    @Column
     private LocalDateTime updatedAt;
 
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
+    @Column(nullable = false)
+    private String username;
+
+    @Column(nullable = false)
+    private Long userId; // Dacă vrei să ții și id-ul userului (opțional)
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
 }
