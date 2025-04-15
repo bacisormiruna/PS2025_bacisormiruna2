@@ -25,4 +25,9 @@ public class HashtagController {
     public ResponseEntity<HashtagDTO> createHashtag(@RequestBody HashtagDTO hashtagDto) {
         return ResponseEntity.ok(hashtagService.createHashtag(hashtagDto));
     }
+    @DeleteMapping("/{name}")
+    public ResponseEntity<Void> deleteHashtag(@PathVariable String name) {
+        hashtagService.deleteHashtag(name);
+        return ResponseEntity.noContent().build();
+    }
 }

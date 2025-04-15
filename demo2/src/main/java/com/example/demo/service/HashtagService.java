@@ -29,22 +29,9 @@ public class HashtagService {
         Hashtag savedHashtag = hashtagRepository.save(hashtag);
             return new HashtagDTO(savedHashtag.getId(),savedHashtag.getName());
     }
-//    public Hashtag findOrCreateHashtag(String name) {
-//        Optional<Hashtag> existingHashtag = hashtagRepository.findByName(name);
-//        if (existingHashtag.isPresent()) {
-//            System.out.println("Hashtag existent găsit: " + name);
-//            return existingHashtag.get();
-//        } else {
-//            System.out.println("Creare hashtag nou: " + name);
-//            Hashtag newHashtag = new Hashtag();
-//            newHashtag.setName(name);
-//            return hashtagRepository.save(newHashtag);
-//        }
-//    }
 
     @Transactional
     public Hashtag findOrCreateHashtag(String name) {
-        // Normalizează numele hashtag-ului (opțional)
         String normalizedName = name.startsWith("#") ? name : "#" + name;
 
         return hashtagRepository.findByName(normalizedName)
@@ -87,4 +74,8 @@ public class HashtagService {
 //        }
 //    }
 
+    @Transactional
+    public void deleteHashtag(String name) {
+        hashtagRepository.deleteByNameIgnoreCase(name);
+    }
 }

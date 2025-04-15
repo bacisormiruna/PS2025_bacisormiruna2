@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import com.example.demo.builder.userbuilder.UserBuilder;
 import com.example.demo.builder.userbuilder.UserViewBuilder;
+import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.dto.userdto.UserDTO;
 import com.example.demo.dto.userdto.UserViewDTO;
@@ -12,9 +13,22 @@ import com.example.demo.errorhandler.UserException;
 import com.example.demo.repository.RoleRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.validator.UserFieldValidator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,15 +39,20 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -52,6 +71,7 @@ public class UserService{
 
     @Autowired
     private final WebClient webClientBuilder;
+    private final ObjectMapper objectMapper;
 
     public List<UserViewDTO> findAllUserView() {
 
@@ -247,26 +267,87 @@ public class UserService{
                 .bodyToFlux(PostDTO.class);
     }
 
-//    public Mono<PostDTO> createPost(@RequestPart("postDto") PostDTO postDTO, @RequestPart("image") MultipartFile imageFile) throws UserException {
-//        return webClientBuilder
-//                .post()
-//                .uri("/api/posts")
-//                .body(BodyInserters.fromMultipartData("postDto",postDTO)
-//                        .with("image", imageFile.getResource()))
-//                .retrieve()
-//                .bodyToMono(PostDTO.class);
-//    }
+    public PostDTO createPost(
+            Long userId,
+            String username,
+            PostCreateDTO postCreateDTO,
+            MultipartFile imageFile,
+            String authHeader) throws Exception {
 
-    public Mono<PostDTO> createPost(Long userId, PostDTO postDTO, MultipartFile imageFile) {
-        return webClientBuilder
-                .post()
-                .uri("/api/posts")
-                .body(BodyInserters.fromMultipartData("postDto", postDTO)
-                        .with("userId", userId)
-                        .with("image", imageFile.getResource()))
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+
+        Map<String, Object> postData = new HashMap<>();
+        postData.put("content", postCreateDTO.getContent());
+        postData.put("isPublic", postCreateDTO.getIsPublic());
+        postData.put("hashtags", postCreateDTO.getHashtags());
+
+        builder.part("postCreateDto", objectMapper.writeValueAsString(postData))
+                .contentType(MediaType.APPLICATION_JSON);
+
+        if (imageFile != null && !imageFile.isEmpty()) {
+            builder.part("image", imageFile.getResource())
+                    .filename(imageFile.getOriginalFilename());
+        }
+
+        return webClientBuilder.post()
+                .uri("/api/posts") // Sau numele din service discovery
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .header("Authorization", authHeader)
+                .body(BodyInserters.fromMultipartData(builder.build()))
                 .retrieve()
-                .bodyToMono(PostDTO.class);
+                .bodyToMono(PostDTO.class)
+                .block(); // Folosim block() pentru că avem nevoie de răspuns sincron
     }
 
 
+    public PostDTO updatePost(
+            Long userId,
+            String username,
+            PostCreateDTO postCreateDTO,
+            MultipartFile imageFile,
+            String authHeader) throws Exception {
+
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+
+        Map<String, Object> postData = new HashMap<>();
+        postData.put("content", postCreateDTO.getContent());
+        postData.put("isPublic", postCreateDTO.getIsPublic());
+        postData.put("hashtags", postCreateDTO.getHashtags());
+
+        builder.part("postCreateDto", objectMapper.writeValueAsString(postData))
+                .contentType(MediaType.APPLICATION_JSON);
+
+        if (imageFile != null && !imageFile.isEmpty()) {
+            builder.part("image", imageFile.getResource())
+                    .filename(imageFile.getOriginalFilename());
+        }
+
+        return webClientBuilder.post()
+                .uri("/api/posts") // Sau numele din service discovery
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .header("Authorization", authHeader)
+                .body(BodyInserters.fromMultipartData(builder.build()))
+                .retrieve()
+                .bodyToMono(PostDTO.class)
+                .block(); // Folosim block() pentru că avem nevoie de răspuns sincron
+    }
+
+
+
+//    public Mono<List<PostDTO>> getUserPostsFromPostServiceAsync(String username, boolean onlyPublic) {
+//        return webClientBuilder.get()
+//                .uri(uriBuilder -> uriBuilder
+//                        .path("/api/posts/user/{username}")
+//                        .queryParam("onlyPublic", onlyPublic)
+//                        .build(username))
+//                .retrieve()
+//                .bodyToFlux(PostDTO.class)
+//                .collectList();
+//    }
+
+
+
+
 }
+
+

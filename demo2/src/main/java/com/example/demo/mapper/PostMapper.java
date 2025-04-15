@@ -7,8 +7,11 @@ import com.example.demo.entity.Hashtag;
 import com.example.demo.entity.Post;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.stream.Collectors;
+
+import static java.lang.System.currentTimeMillis;
 
 @Component
 public class PostMapper {
@@ -59,19 +62,24 @@ public class PostMapper {
         }
         return post;
     }
-    public Post toEntity(PostCreateDTO postCreateDTO) {
+
+    public Post toEntity(PostCreateDTO postCreateDTO, Long authorId, String username) {
         if (postCreateDTO == null) {
             return null;
         }
 
         Post post = new Post();
         post.setContent(postCreateDTO.getContent());
+        post.setImageUrl(postCreateDTO.getImageUrl());
         post.setIsPublic(postCreateDTO.getIsPublic());
+        post.setAuthorId(authorId);
+        post.setUsername(username);
+        post.setCreatedAt(LocalDateTime.now());
+        post.setUpdatedAt(LocalDateTime.now());
 
-        // Hashtag-urile le setezi după ce verifici în service dacă există în DB, deci aici doar inițializezi:
         if (postCreateDTO.getHashtags() != null) {
             post.setHashtags(postCreateDTO.getHashtags().stream()
-                    .map(Hashtag::new) // creezi Hashtag pe baza numelui
+                    .map(hashtagDto -> new Hashtag(hashtagDto.getName()))
                     .collect(Collectors.toSet()));
         } else {
             post.setHashtags(new HashSet<>());
@@ -79,5 +87,6 @@ public class PostMapper {
 
         return post;
     }
+
 
 }

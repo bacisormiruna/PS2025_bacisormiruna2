@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.hashtagdto.HashtagDTO;
+import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.dto.userdto.UserDTO;
 import com.example.demo.entity.User;
@@ -31,7 +32,12 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.mysql.cj.conf.PropertyKey.logger;
 
@@ -97,37 +103,6 @@ public class UserController {
         return new ResponseEntity<>(userService.getPostsFromM2(), HttpStatus.OK);
     }
 
-//crearea de postari
-    @PostMapping(
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE, // Important pentru Multipart
-            value = "/createPost"
-    )
-    public ResponseEntity<Mono<PostDTO>> createPost(
-            @RequestPart("postDto") PostDTO postDTO,  // Folosește @RequestPart pentru DTO
-            @RequestPart("image") MultipartFile imageFile  // Primește fișierul
-    ) throws UserException {
-        Long userId = userService.getAuthenticatedUserId();
-        return ResponseEntity.ok(userService.createPost(userId,postDTO,imageFile));
-    }
-
-    @GetMapping("/check-auth")
-    public ResponseEntity<String> checkAuth(@AuthenticationPrincipal UserDetails userDetails) throws UserException {
-        if (userDetails != null) {
-            return ResponseEntity.ok("User logat: " + userService.getAuthenticatedUsername() + "cu id-ul: "+userService.getAuthenticatedUserId());
-        } else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Nu este autentificat");
-        }
-    }
-
-    @GetMapping("/me")
-    public ResponseEntity<Long> getMyUserId(@AuthenticationPrincipal UserDetails userDetails) throws UserException {
-        if (userDetails != null) {
-            Long userId = userService.getAuthenticatedUserId();  // metoda ta
-            return ResponseEntity.ok(userId);
-        } else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-    }
 
     @PostMapping("/user-info")
     public ResponseEntity getUserInfo(@RequestHeader("Authorization") String authHeader) {
@@ -178,6 +153,74 @@ public class UserController {
     }
 
 
+//--------------crearea unei postari------------------------
+    @PostMapping(
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            path = "/createPosts"
+    )
+    public ResponseEntity<?> createPost(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestPart("postCreateDto") PostCreateDTO postCreateDTO,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) {
+
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Token missing or invalid format");
+            }
+
+            String token = authHeader.substring(7);
+            String username = jwtService.extractUsername(token);
+            Long userId = jwtService.extractUserId(token);
+
+            if (username == null || userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Invalid token");
+            }
+            PostDTO createdPost = userService.createPost(userId, username, postCreateDTO, imageFile, authHeader);
+            return ResponseEntity.ok(createdPost);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error creating post: " + e.getMessage());
+        }
+    }
+
+//---------------actualizarea unei postari ---------------------------
+
+
+    //--------------crearea unei postari------------------------
+    @PutMapping(
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            path = "/updatePost"
+    )
+    public ResponseEntity<?> updatePost(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestPart("postCreateDto") PostCreateDTO postCreateDTO,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) {
+
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Token missing or invalid format");
+            }
+
+            String token = authHeader.substring(7);
+            String username = jwtService.extractUsername(token);
+            Long userId = jwtService.extractUserId(token);
+
+            if (username == null || userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Invalid token");
+            }
+            PostDTO createdPost = userService.updatePost(userId, username, postCreateDTO, imageFile, authHeader);
+            return ResponseEntity.ok(createdPost);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error creating post: " + e.getMessage());
+        }
+    }
 
 
 

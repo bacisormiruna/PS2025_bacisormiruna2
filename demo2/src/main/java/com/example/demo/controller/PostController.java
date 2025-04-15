@@ -1,11 +1,13 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.errorhandler.PostNotFoundException;
 import com.example.demo.errorhandler.UnauthorizedException;
 import com.example.demo.errorhandler.UserException;
 import com.example.demo.service.JWTService;
 import com.example.demo.service.PostService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -83,13 +85,14 @@ public class PostController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<PostDTO> createPost(
             @RequestHeader ("Authorization") String authHeader,
-            @RequestPart("postDto") String postDtoJson,
+            @RequestPart("postCreateDto") String postDtoJson,
             @RequestPart(value = "image", required = false) MultipartFile imageFile) throws Exception {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
         String token = authHeader.substring(7);
         Long userId = jwtService.extractUserId(token);
+        String username = jwtService.extractUsername(token);
 
         if (userId == null || userId <= 0) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
@@ -99,38 +102,47 @@ public class PostController {
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-        PostDTO postDTO = objectMapper.readValue(postDtoJson, PostDTO.class);
+        PostCreateDTO postCreateDTO = objectMapper.readValue(postDtoJson, PostCreateDTO.class);
 
-        PostDTO createdPost = postService.createPost1(userId, postDTO, imageFile);
+        PostDTO createdPost = postService.createPost1(userId,username, postCreateDTO, imageFile);
         return ResponseEntity.ok(createdPost);
     }
 
 
     @PutMapping(value = "/{postId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<PostDTO> updatePost(
+    public ResponseEntity<?> updatePost(
             @PathVariable Long postId,
-            @RequestPart("postDto") String postDtoJson,
-            @RequestPart(value = "image", required = false) MultipartFile imageFile) throws Exception {
+            @RequestHeader("Authorization") String authHeader,
+            @RequestPart("postCreateDto") String postCreateDtoJson,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) {
 
         try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+
+            String token = authHeader.substring(7);
+            String username = jwtService.extractUsername(token);
+            if (username == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+
             ObjectMapper objectMapper = new ObjectMapper();
             objectMapper.registerModule(new JavaTimeModule());
-            objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            PostCreateDTO postCreateDto = objectMapper.readValue(postCreateDtoJson, PostCreateDTO.class);
 
-            PostDTO postDTO = objectMapper.readValue(postDtoJson, PostDTO.class);
-            //String username = principal.getName();
-            PostDTO updatedPost = postService.updatePost(postId, postDTO, postDTO.getUsername(), imageFile);
-            System.out.println("Updated post with hashtags: " + updatedPost.getHashtags());
+            PostDTO updatedPost = postService.updatePost(postId, postCreateDto, username, imageFile);
 
             return ResponseEntity.ok(updatedPost);
 
         } catch (PostNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (UnauthorizedException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (JsonProcessingException e) {
+            return ResponseEntity.badRequest().body("Invalid JSON format");
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().build();
+            return ResponseEntity.internalServerError().body("Error updating post");
         }
     }
 
@@ -140,21 +152,22 @@ public class PostController {
     }
 
     @DeleteMapping("/{postId}")
-    public ResponseEntity<Void> deletePost(
+    public ResponseEntity<?> deletePost(
             @PathVariable Long postId,
-            @RequestParam String username) {//aici era Principal principal
-
+            @RequestHeader("Authorization") String authHeader) {
         try {
+            String token = authHeader.substring(7);
+            String username = jwtService.extractUsername(token);
+
             postService.deletePost(postId, username);
             return ResponseEntity.noContent().build();
 
         } catch (PostNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (UnauthorizedException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().build();
+            return ResponseEntity.internalServerError().body("Error deleting post");
         }
     }
 
@@ -168,10 +181,10 @@ public class PostController {
         return ResponseEntity.ok(postService.searchPosts(query));
     }
 
-    @GetMapping("/user/{username}")
-    public ResponseEntity<List<PostDTO>> getPostsByUsername(@PathVariable String username) {
-        return ResponseEntity.ok(postService.getPostsByUsername(username));
-    }
+//    @GetMapping("/user/{username}")
+//    public ResponseEntity<List<PostDTO>> getPostsByUsername(@PathVariable String username) {
+//        return ResponseEntity.ok(postService.getPostsByUsername(username));
+//    }
     @PostMapping("/user-info")
     public ResponseEntity<?> getUserInfo(@RequestHeader("Authorization") String authHeader) {
         try {
@@ -211,5 +224,44 @@ public class PostController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
         }
     }
+
+    @GetMapping("/user/{username}")
+    public ResponseEntity<List<PostDTO>> getPostsByUser(@PathVariable String username){
+        List<PostDTO> posts = postService.getPostsByUsername(username);
+        return ResponseEntity.ok(posts);
+    }
+
+    @PostMapping("/{postId}/hashtags")
+    public ResponseEntity<PostDTO> addHashtagsToPost(
+            @PathVariable Long postId,
+            @RequestParam List<String> hashtags,
+            @RequestHeader("Authorization") String authHeader) {
+
+        try {
+            String token = authHeader.substring(7);
+            String username = jwtService.extractUsername(token);
+
+            PostDTO updatedPost = postService.addHashtagsToPost(postId, hashtags, username);
+            return ResponseEntity.ok(updatedPost);
+
+        } catch (PostNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (UnauthorizedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/filter")
+    public ResponseEntity<List<PostDTO>> filterPosts(
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String content,
+            @RequestParam(required = false) String hashtag) {
+
+        List<PostDTO> posts = postService.getFilteredPosts(username, content, hashtag);
+        return ResponseEntity.ok(posts);
+    }
+
 
 }
