@@ -1,5 +1,6 @@
 package com.example.demo.entity;
 
+import com.example.demo.dto.hashtagdto.HashtagDTO;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
@@ -32,6 +33,9 @@ public class Hashtag {
     public Hashtag(Long id, String name) {
         this.id=id;
         this.name=name;
+    }
+
+    public Hashtag(HashtagDTO hashtagDTO) {
     }
 
     @Override

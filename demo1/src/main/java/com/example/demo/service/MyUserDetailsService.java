@@ -25,4 +25,11 @@ public class MyUserDetailsService implements UserDetailsService{
         }
         return new UserPrincipal(user);
     }
+
+    public UserDetails loadUserByUserId(Long userId) throws UsernameNotFoundException {
+        return repo.findById(userId)
+                .map(UserPrincipal::new)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    }
+
 }

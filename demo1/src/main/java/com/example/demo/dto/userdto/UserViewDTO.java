@@ -9,6 +9,7 @@ import lombok.*;
 @Builder
 public class UserViewDTO implements Comparable<UserViewDTO>{
 
+    private Long id;
     private String name;
 
     private String email;

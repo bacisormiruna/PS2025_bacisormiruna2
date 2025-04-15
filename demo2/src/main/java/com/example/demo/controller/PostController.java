@@ -1,10 +1,9 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.hashtagdto.HashtagDTO;
 import com.example.demo.dto.postdto.PostDTO;
-import com.example.demo.entity.Hashtag;
 import com.example.demo.errorhandler.PostNotFoundException;
 import com.example.demo.errorhandler.UnauthorizedException;
+import com.example.demo.errorhandler.UserException;
 import com.example.demo.service.JWTService;
 import com.example.demo.service.PostService;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -16,13 +15,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.security.Principal;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -57,32 +58,51 @@ public class PostController {
 //        return ResponseEntity.ok(createdPost);
 //    }
 
+//    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+//    public ResponseEntity<PostDTO> createPost(
+//            @RequestPart("postDto") String postDtoJson,
+//            @RequestPart(value = "image", required = false) MultipartFile imageFile) throws Exception {
+//        try {
+//            ObjectMapper objectMapper = new ObjectMapper();
+//            objectMapper.registerModule(new JavaTimeModule());
+//            objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+//
+//            PostDTO postDTO = objectMapper.readValue(postDtoJson, PostDTO.class);
+////pun 0 la userId ca sa nu mai fac request la baza de date
+//            PostDTO createdPost = postService.createPost1(postDTO, imageFile);
+//            System.out.println("Hashtags for the post: " + createdPost.getHashtags());
+//            return ResponseEntity.ok(createdPost);
+//
+//
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            throw new RuntimeException("Error creating post: " + e.getMessage());
+//        }
+//    }
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<PostDTO> createPost(
+            @RequestHeader ("Authorization") String authHeader,
             @RequestPart("postDto") String postDtoJson,
             @RequestPart(value = "image", required = false) MultipartFile imageFile) throws Exception {
-
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            objectMapper.registerModule(new JavaTimeModule());
-            objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-            PostDTO postDTO = objectMapper.readValue(postDtoJson, PostDTO.class);
-
-            // Extract userId from security context or from postDTO
-            //Long userId = postDTO.getAuthorId() != null ?
-            //        postDTO.getAuthorId() : getUserIdFromUsername(postDTO.getUsername());
-
-            // Create the post
-            PostDTO createdPost = postService.createPost1(postDTO, imageFile);
-            System.out.println("Hashtags for the post: " + createdPost.getHashtags());
-            return ResponseEntity.ok(createdPost);
-
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Error creating post: " + e.getMessage());
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
+        String token = authHeader.substring(7);
+        Long userId = jwtService.extractUserId(token);
+
+        if (userId == null || userId <= 0) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        PostDTO postDTO = objectMapper.readValue(postDtoJson, PostDTO.class);
+
+        PostDTO createdPost = postService.createPost1(userId, postDTO, imageFile);
+        return ResponseEntity.ok(createdPost);
     }
 
 
@@ -152,4 +172,44 @@ public class PostController {
     public ResponseEntity<List<PostDTO>> getPostsByUsername(@PathVariable String username) {
         return ResponseEntity.ok(postService.getPostsByUsername(username));
     }
+    @PostMapping("/user-info")
+    public ResponseEntity<?> getUserInfo(@RequestHeader("Authorization") String authHeader) {
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token missing or invalid format");
+            }
+            String token = authHeader.substring(7);  // elimină "Bearer " și păstrează doar tokenul
+            String username = jwtService.extractUsername(token);
+            Long userId = jwtService.extractUserId(token);
+            Map<String, Object> userInfo = new HashMap<>();
+            userInfo.put("username", username);
+            userInfo.put("userId", userId);
+            return ResponseEntity.ok(userInfo);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/ui")
+    public ResponseEntity getUI(@RequestHeader("Authorization") String authHeader) {
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token missing or invalid format");
+            }
+            String token = authHeader.substring(7);
+            System.out.println("Extracted token: " + token);
+            String username = jwtService.extractUsername(token);
+            System.out.println("Extracted username: " + username);
+            Long userId = jwtService.extractUserId(token);
+            System.out.println("Extracted userId: " + userId);
+            if (username == null || userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
+            }
+            return ResponseEntity.ok(userId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
+        }
+    }
+
 }

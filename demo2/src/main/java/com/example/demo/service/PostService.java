@@ -13,6 +13,12 @@ import com.example.demo.repository.PostRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,6 +37,8 @@ public class PostService {
 
     @Autowired
     private HashtagRepository hashtagRepository;
+    @Autowired
+    private JWTService jwtService;
 
     @Autowired
     private PostMapper postMapper;
@@ -69,10 +77,11 @@ public class PostService {
 
 
     @Transactional
-    public PostDTO createPost1(PostDTO postDto, MultipartFile imageFile) throws Exception {
+    public PostDTO createPost1(Long id, PostDTO postDto, MultipartFile imageFile) throws Exception {
         Post post = postMapper.toEntity(postDto);
         post.setCreatedAt(LocalDateTime.now());
         post.setUpdatedAt(LocalDateTime.now());
+        post.setAuthorId(id);
         if (postDto.getHashtags() != null && !postDto.getHashtags().isEmpty()) {
             Set<Hashtag> hashtags = new HashSet<>();
 
@@ -97,6 +106,18 @@ public class PostService {
                 .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + id));
         return postMapper.toDto(post);
     }
+
+    public Long getUserIdFromSecurityContext() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            String userId = (String) authentication.getPrincipal();
+            return Long.parseLong(userId);
+        }
+        return null;
+    }
+
+
+
 
 //    public PostDTO updatePost(Long id, PostDTO postDto, String username, MultipartFile imageFile) throws Exception {
 //        Post existingPost = postRepository.findById(id)

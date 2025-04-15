@@ -1,7 +1,10 @@
 package com.example.demo.service;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
+import com.example.demo.dto.userdto.UserDTO;
+import com.example.demo.entity.User;
+import com.example.demo.errorhandler.UserException;
+import io.jsonwebtoken.*;
+
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,37 +22,66 @@ import java.util.function.Function;
 @Service
 public class JWTService {
 
+    //private final UserService userService;
     private String key =""; //"m6AlbnFzbCYyYW6BIGdlbmVyYXRlZCBrZXkgZm9yIIIIc3Rpbmc?";
+    private static final String SECRET_KEY = "m6AlbnFzbCYyYW6BIGdlbmVyYXRlZCBrZXkgZm9yIIIIc3Rpbmc?";
+//    public JWTService(UserService userService) {
+//        try {
+//            KeyGenerator keyGenerator= KeyGenerator.getInstance("HmacSHA256");
+//            SecretKey secretKey= keyGenerator.generateKey();
+//            key=Base64.getEncoder().encodeToString(secretKey.getEncoded());
+//        } catch (NoSuchAlgorithmException e) {
+//            throw new RuntimeException(e);
+//        }
+//        this.userService = userService;
+//    }
 
-    public JWTService() {
-        try {
-            KeyGenerator keyGenerator= KeyGenerator.getInstance("HmacSHA256");
-            SecretKey secretKey= keyGenerator.generateKey();
-            key=Base64.getEncoder().encodeToString(secretKey.getEncoded());
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    public String generatToken(String username) {
+
+    public String generateToken(UserDTO userDTO) throws UserException {
         Map<String, Object> claims = new HashMap<>();
+        claims.put("name", userDTO.getName());
+        claims.put("id", userDTO.getId());  // Modificat de la "userId" la "id" pentru consistență
+
         return Jwts.builder()
-                .claims()
-                .add(claims)
-                .subject(username)
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + 24 * 60 * 60 * 1000))
-                .and()
-                .signWith(getKey())
+                .setClaims(claims)
+                .setSubject(userDTO.getName())
+                .setId(userDTO.getId().toString())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10))
+                .signWith(SignatureAlgorithm.HS256, SECRET_KEY)
                 .compact();
     }
 
+
+    public String generatToken(String username) {
+    return Jwts.builder()
+            .setSubject(username)
+            .setIssuedAt(new Date(System.currentTimeMillis()))
+            .setExpiration(new Date(System.currentTimeMillis() + 24 * 60 * 60 * 1000)) // 24 ore
+            .signWith(getKey())
+            .compact();
+}
+
     private SecretKey getKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(key);
+        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+
+    public Long extractUserId(String token) {
+        try {
+            JwtParser parser = Jwts.parserBuilder()
+                    .setSigningKey(SECRET_KEY)
+                    .build();
+            return parser.parseClaimsJws(token)
+                    .getBody()
+                    .get("id", Long.class);
+        } catch (JwtException e) {
+            throw new IllegalArgumentException("Invalid token", e);
+        }
     }
 
     private <T> T extractClaim(String token, Function<Claims, T> claimResolver){
@@ -59,10 +91,11 @@ public class JWTService {
 
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
-                .verifyWith(getKey()).build()
-                .parseSignedClaims(token)
-                .getPayload();
+                .setSigningKey(SECRET_KEY)  // Secretul folosit pentru semnarea token-ului
+                .parseClaimsJws(token)  // Parsează token-ul
+                .getBody();
     }
+
 
     public boolean validateToken(String token, UserDetails userDetails) {
         final String username = extractUsername(token);

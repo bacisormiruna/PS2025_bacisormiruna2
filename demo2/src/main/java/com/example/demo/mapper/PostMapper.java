@@ -1,6 +1,7 @@
 package com.example.demo.mapper;
 
 import com.example.demo.dto.hashtagdto.HashtagDTO;
+import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.entity.Hashtag;
 import com.example.demo.entity.Post;
@@ -58,4 +59,25 @@ public class PostMapper {
         }
         return post;
     }
+    public Post toEntity(PostCreateDTO postCreateDTO) {
+        if (postCreateDTO == null) {
+            return null;
+        }
+
+        Post post = new Post();
+        post.setContent(postCreateDTO.getContent());
+        post.setIsPublic(postCreateDTO.getIsPublic());
+
+        // Hashtag-urile le setezi după ce verifici în service dacă există în DB, deci aici doar inițializezi:
+        if (postCreateDTO.getHashtags() != null) {
+            post.setHashtags(postCreateDTO.getHashtags().stream()
+                    .map(Hashtag::new) // creezi Hashtag pe baza numelui
+                    .collect(Collectors.toSet()));
+        } else {
+            post.setHashtags(new HashSet<>());
+        }
+
+        return post;
+    }
+
 }
