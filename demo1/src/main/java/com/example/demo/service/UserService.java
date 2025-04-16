@@ -2,6 +2,8 @@ package com.example.demo.service;
 
 import com.example.demo.builder.userbuilder.UserBuilder;
 import com.example.demo.builder.userbuilder.UserViewBuilder;
+import com.example.demo.dto.commentdto.CommentCreateDTO;
+import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.dto.userdto.UserDTO;
@@ -9,6 +11,8 @@ import com.example.demo.dto.userdto.UserViewDTO;
 import com.example.demo.entity.Role;
 import com.example.demo.entity.User;
 import com.example.demo.entity.UserPrincipal;
+import com.example.demo.errorhandler.PostNotFoundException;
+import com.example.demo.errorhandler.UnauthorizedException;
 import com.example.demo.errorhandler.UserException;
 import com.example.demo.repository.RoleRepository;
 import com.example.demo.repository.UserRepository;
@@ -22,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -46,6 +51,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -187,7 +193,6 @@ public class UserService{
 //    }
 
     public String verify(UserDTO loginDTO) throws UserException {
-        // Autentifică utilizatorul
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginDTO.getName(), loginDTO.getPassword())
         );
@@ -196,21 +201,17 @@ public class UserService{
             throw new UserException("Login failed. Invalid credentials.");
         }
 
-        // Găsește utilizatorul complet din baza de date
         User user = userRepository.findByName(loginDTO.getName());
         if (user == null) {
             throw new UserException("User not found");
         }
 
-        // Creează un UserDTO complet cu ID
         UserDTO userDTO = UserDTO.builder()
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
                 .roleName(user.getRole().getName())
                 .build();
-
-        // Generează token cu toate informațiile
         return jwtService.generateToken(userDTO);
     }
 
@@ -228,7 +229,6 @@ public class UserService{
         }
         return jwtService.generateToken(userDTO);
     }
-
 
 
     public Long getAuthenticatedUserId() throws UserException {
@@ -266,7 +266,7 @@ public class UserService{
                 .retrieve()
                 .bodyToFlux(PostDTO.class);
     }
-
+//createPost
     public PostDTO createPost(
             Long userId,
             String username,
@@ -299,8 +299,9 @@ public class UserService{
                 .block(); // Folosim block() pentru că avem nevoie de răspuns sincron
     }
 
-
+//updatePost
     public PostDTO updatePost(
+            Long postId,
             Long userId,
             String username,
             PostCreateDTO postCreateDTO,
@@ -322,28 +323,118 @@ public class UserService{
                     .filename(imageFile.getOriginalFilename());
         }
 
-        return webClientBuilder.post()
-                .uri("/api/posts") // Sau numele din service discovery
+        return webClientBuilder.put()
+                .uri("/api/posts/" + postId) // Sau numele din service discovery
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .header("Authorization", authHeader)
                 .body(BodyInserters.fromMultipartData(builder.build()))
                 .retrieve()
                 .bodyToMono(PostDTO.class)
-                .block(); // Folosim block() pentru că avem nevoie de răspuns sincron
+                .block();
+    }
+
+    //deletePost
+    public void deletePost(Long postId, String username, Long userId, String authHeader) {
+        try {
+            webClientBuilder.delete()
+                    .uri("/api/posts/" + postId)
+                    .header("Authorization", authHeader)
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block();
+        } catch (WebClientResponseException.NotFound e) {
+            throw new PostNotFoundException("Post not found with id: " + postId);
+        } catch (WebClientResponseException.Forbidden e) {
+            throw new UnauthorizedException("You can only delete your own posts");
+        } catch (Exception e) {
+            throw new RuntimeException("Error when deleting post: " + e.getMessage(), e);
+        }
+    }
+
+    //--sa adaug hashtaguri
+
+    //sa adaug partea de getFeed
+    public List<PostDTO> getPostsByUserFromOtherService(String username) {
+        return webClientBuilder.get()
+                .uri("api/posts/user/{username}", username)  // Apelăm endpoint-ul din al doilea microserviciu
+                .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(errorBody -> Mono.error(new RuntimeException("Client error: " + errorBody))))
+                .onStatus(HttpStatusCode::is5xxServerError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(errorBody -> Mono.error(new RuntimeException("Server error: " + errorBody))))
+                .bodyToMono(new ParameterizedTypeReference<List<PostDTO>>() {})
+                .block();
+    }
+
+    public PostDTO addHashtagsToUserPost(Long postId, List<String> hashtags, String username, String token) {
+        try {
+            return webClientBuilder.post()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("api/posts/{postId}/hashtags")
+                            .build(postId))
+                    .header("Authorization", "Bearer " + token)
+                    .bodyValue(hashtagsToParams(hashtags))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is5xxServerError, response -> {
+                        if (response.statusCode() == HttpStatus.NOT_FOUND) {
+                            return Mono.error(new PostNotFoundException("Post not found: " + postId));
+                        } else if (response.statusCode() == HttpStatus.FORBIDDEN) {
+                            return Mono.error(new UnauthorizedException("You cannot modify this post."));
+                        }
+                        return Mono.error(new RuntimeException("Client error: " + response.statusCode()));
+                    })
+                    .onStatus(HttpStatusCode::is5xxServerError, response ->
+                            Mono.error(new RuntimeException("Server error: " + response.statusCode()))
+                    )
+                    .bodyToMono(PostDTO.class)
+                    .block();
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error while adding hashtags: " + e.getMessage(), e);
+        }
+    }
+
+    private MultiValueMap<String, String> hashtagsToParams(List<String> hashtags) {
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.put("hashtags", hashtags);
+        return params;
     }
 
 
 
-//    public Mono<List<PostDTO>> getUserPostsFromPostServiceAsync(String username, boolean onlyPublic) {
-//        return webClientBuilder.get()
-//                .uri(uriBuilder -> uriBuilder
-//                        .path("/api/posts/user/{username}")
-//                        .queryParam("onlyPublic", onlyPublic)
-//                        .build(username))
-//                .retrieve()
-//                .bodyToFlux(PostDTO.class)
-//                .collectList();
-//    }
+    public CommentDTO createCommentForPost(Long postId, CommentCreateDTO commentCreateDto, String token) {
+
+        return webClientBuilder.post()
+                .uri("api/comments/addComment/{postId}", postId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .bodyValue(commentCreateDto)
+                .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, clientResponse -> clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> Mono.error(new RuntimeException("Client error: " + errorBody))))
+                .onStatus(HttpStatusCode::is5xxServerError, clientResponse -> clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> Mono.error(new RuntimeException("Server error: " + errorBody))))
+                .bodyToMono(CommentDTO.class)
+                .block();
+    }
+
+    public List<PostDTO> filterPosts(String username, String content, String hashtag) {
+        return webClientBuilder
+                .get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/posts/filter")  // Endpoint-ul corect al al doilea microserviciu
+                        .queryParam("username", username)
+                        .queryParam("content", content)
+                        .queryParam("hashtag", hashtag)
+                        .build())
+                .retrieve()
+                .bodyToFlux(PostDTO.class)
+                .collectList()
+                .block();
+    }
+
+
 
 
 

@@ -4,7 +4,6 @@ import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.errorhandler.PostNotFoundException;
 import com.example.demo.errorhandler.UnauthorizedException;
-import com.example.demo.errorhandler.UserException;
 import com.example.demo.service.JWTService;
 import com.example.demo.service.PostService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -16,10 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -258,7 +253,6 @@ public class PostController {
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String content,
             @RequestParam(required = false) String hashtag) {
-
         List<PostDTO> posts = postService.getFilteredPosts(username, content, hashtag);
         return ResponseEntity.ok(posts);
     }

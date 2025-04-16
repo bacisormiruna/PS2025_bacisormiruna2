@@ -1,5 +1,6 @@
 package com.example.demo.dto.commentdto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,12 +14,17 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class CommentDTO {
     private Long id;
-    private Long postId;
-    private Long userId;
-    private String username;
     private String content;
     private String imageUrl;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;
+
+    private String username;
+    private Long authorId;
+    private Long postId;
 }
 

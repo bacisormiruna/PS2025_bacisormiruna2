@@ -241,11 +241,9 @@ public class PostService {
     public PostDTO addHashtagsToPost(Long postId, List<String> hashtagNames, String username) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
-
         if (!post.getUsername().equals(username)) {
             throw new UnauthorizedException("You can only modify your own posts");
         }
-
         Set<Hashtag> newHashtags = new HashSet<>();
         for (String hashtagName : hashtagNames) {
             if (hashtagName != null && !hashtagName.trim().isEmpty()) {
@@ -262,7 +260,6 @@ public class PostService {
     }
 
     public List<PostDTO> getFilteredPosts(String username, String content, String hashtag) {
-        // Normalizare hashtag (adaugă # dacă lipsește)
         String normalizedHashtag = (hashtag != null && !hashtag.startsWith("#")) ? "#" + hashtag : hashtag;
 
         List<Post> posts = postRepository.findByFilters(

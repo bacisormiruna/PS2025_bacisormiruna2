@@ -1,45 +1,26 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.hashtagdto.HashtagDTO;
+import com.example.demo.dto.commentdto.CommentCreateDTO;
+import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.dto.userdto.UserDTO;
 import com.example.demo.entity.User;
-import com.example.demo.errorhandler.FriendshipException;
+import com.example.demo.errorhandler.PostNotFoundException;
+import com.example.demo.errorhandler.UnauthorizedException;
 import com.example.demo.errorhandler.UserException;
-import com.example.demo.repository.UserRepository;
 import com.example.demo.service.JWTService;
 import com.example.demo.service.UserService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.MultipartBodyBuilder;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-
-import java.time.Duration;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
-import static com.mysql.cj.conf.PropertyKey.logger;
 
 @RestController
 @CrossOrigin
@@ -186,15 +167,13 @@ public class UserController {
         }
     }
 
-//---------------actualizarea unei postari ---------------------------
-
-
-    //--------------crearea unei postari------------------------
+    //--------------actualizarea unei postari------------------------
     @PutMapping(
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
-            path = "/updatePost"
+            path = "/updatePosts/{postId}"
     )
     public ResponseEntity<?> updatePost(
+            @PathVariable Long postId,
             @RequestHeader("Authorization") String authHeader,
             @RequestPart("postCreateDto") PostCreateDTO postCreateDTO,
             @RequestPart(value = "image", required = false) MultipartFile imageFile) {
@@ -213,13 +192,120 @@ public class UserController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body("Invalid token");
             }
-            PostDTO createdPost = userService.updatePost(userId, username, postCreateDTO, imageFile, authHeader);
-            return ResponseEntity.ok(createdPost);
 
+            PostDTO updatedPost = userService.updatePost(postId, userId, username, postCreateDTO, imageFile, authHeader);
+            return ResponseEntity.ok(updatedPost);
+
+        } catch (PostNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (UnauthorizedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error creating post: " + e.getMessage());
+                    .body("Error updating post: " + e.getMessage());
         }
+    }
+//stergerea unei postari
+
+
+    @DeleteMapping("/posts/{postId}")
+    public ResponseEntity<?> deletePost(
+            @PathVariable Long postId,
+            @RequestHeader("Authorization") String authHeader) {
+
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Token missing or invalid format");
+            }
+
+            String token = authHeader.substring(7);
+            String username = jwtService.extractUsername(token);
+            Long userId = jwtService.extractUserId(token);
+
+            if (username == null || userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("Invalid token");
+            }
+
+            userService.deletePost(postId, username, userId, authHeader);
+            return ResponseEntity.noContent().build();
+
+        } catch (PostNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (UnauthorizedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error deleting post: " + e.getMessage());
+        }
+    }
+
+
+    @GetMapping("/{username}/posts")
+    public ResponseEntity<List<PostDTO>> getPostsByUser(@PathVariable String username) {
+        try {
+            List<PostDTO> posts = userService.getPostsByUserFromOtherService(username);
+            return ResponseEntity.ok(posts);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+
+    @PostMapping("/addComment/{postId}")
+    public ResponseEntity<?> addCommentThroughUserService(
+            @PathVariable Long postId,
+            @RequestBody CommentCreateDTO commentCreateDto,
+            @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+
+        try {
+            CommentDTO createdComment = userService.createCommentForPost(postId, commentCreateDto, authHeader.substring(7));
+            return ResponseEntity.ok(createdComment);
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+
+    @PostMapping("/posts/{postId}/hashtags")
+    public ResponseEntity<PostDTO> addHashtagsToUserPost(
+            @PathVariable Long postId,
+            @RequestParam List<String> hashtags,
+            @RequestHeader("Authorization") String authHeader) {
+
+        try {
+            String token = authHeader.substring(7);
+            String username = jwtService.extractUsername(token);
+
+            PostDTO updatedPost = userService.addHashtagsToUserPost(postId, hashtags, username, token);
+            return ResponseEntity.ok(updatedPost);
+
+        } catch (PostNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (UnauthorizedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/filterPosts")
+    public ResponseEntity<List<PostDTO>> filterPosts(
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String content,
+            @RequestParam(required = false) String hashtag) {
+        System.out.println("Filtering posts for username: " + username);
+        System.out.println("Filtering posts for content: " + content);
+        System.out.println("Filtering posts for hashtag: " + hashtag);
+
+        List<PostDTO> posts = userService.filterPosts(username, content, hashtag);
+        return ResponseEntity.ok(posts);
     }
 
 

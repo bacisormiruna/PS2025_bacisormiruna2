@@ -11,7 +11,7 @@ public class WebClientConfig {
     public WebClient postsMicroserviceClient() {
         return WebClient.builder()
                 .baseUrl("http://localhost:8081") // URL-ul microserviciului de postări și comentarii
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.MULTIPART_FORM_DATA_VALUE)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }
 }
