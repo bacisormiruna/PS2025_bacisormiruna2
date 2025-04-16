@@ -259,11 +259,18 @@ public class UserService{
         userRepository.save(user);
     }
 
-    public Flux<PostDTO> getPostsFromM2() {
+    public Flux<PostDTO> getPostsFromM2(String authHeader) {
         return webClientBuilder
                 .get()
                 .uri("/api/posts")
+                .header("Authorization", authHeader)
                 .retrieve()
+                .onStatus(HttpStatusCode::isError, response -> {
+                    if (response.statusCode() == HttpStatus.UNAUTHORIZED) {
+                        return Mono.error(new RuntimeException("Unauthorized access"));
+                    }
+                    return Mono.error(new RuntimeException("Error fetching posts"));
+                })
                 .bodyToFlux(PostDTO.class);
     }
 //createPost

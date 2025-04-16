@@ -32,9 +32,19 @@ public class PostController {
     private JWTService jwtService;
 
     @GetMapping
-    public ResponseEntity<List<PostDTO>> getAllPosts(HttpServletRequest request) {
+    public ResponseEntity<List<PostDTO>> getAllPosts( @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+        String token = authHeader.substring(7);
+        Long userId = jwtService.extractUserId(token);
+        String username = jwtService.extractUsername(token);
+
+        if (userId == null || userId <= 0) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
         List<PostDTO> posts = postService.getAllPosts();
-        System.out.println("Posts in controller: " + posts.size()); // Log pentru a verifica lista returnată
+        System.out.println("Posts in controller: " + posts.size());
         return ResponseEntity.ok(posts);
     }
 
@@ -176,10 +186,7 @@ public class PostController {
         return ResponseEntity.ok(postService.searchPosts(query));
     }
 
-//    @GetMapping("/user/{username}")
-//    public ResponseEntity<List<PostDTO>> getPostsByUsername(@PathVariable String username) {
-//        return ResponseEntity.ok(postService.getPostsByUsername(username));
-//    }
+
     @PostMapping("/user-info")
     public ResponseEntity<?> getUserInfo(@RequestHeader("Authorization") String authHeader) {
         try {

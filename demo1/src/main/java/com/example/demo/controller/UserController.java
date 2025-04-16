@@ -19,6 +19,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+
 import java.util.List;
 
 
@@ -78,10 +80,11 @@ public class UserController {
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
-//afisarea postarilor
-    @RequestMapping(value = "/getAllPosts", method = RequestMethod.GET)
-    public ResponseEntity<?> displayAllPosts(){
-        return new ResponseEntity<>(userService.getPostsFromM2(), HttpStatus.OK);
+    @GetMapping("/getAllPosts")
+    public Mono<ResponseEntity<?>> displayAllPosts(@RequestHeader("Authorization") String auth) {
+        return userService.getPostsFromM2(auth)
+                .collectList()
+                .map(posts -> ResponseEntity.ok(posts));
     }
 
 
