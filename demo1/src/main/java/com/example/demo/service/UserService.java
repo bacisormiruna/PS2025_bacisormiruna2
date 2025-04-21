@@ -52,6 +52,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.util.UriBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -427,18 +428,32 @@ public class UserService{
     }
 
     public List<PostDTO> filterPosts(String username, String content, String hashtag) {
-        return webClientBuilder
-                .get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/api/posts/filter")  // Endpoint-ul corect al al doilea microserviciu
-                        .queryParam("username", username)
-                        .queryParam("content", content)
-                        .queryParam("hashtag", hashtag)
-                        .build())
-                .retrieve()
-                .bodyToFlux(PostDTO.class)
-                .collectList()
-                .block();
+        System.out.println("UserService: Filtering posts with username=" + username + ", content=" + content + ", hashtag=" + hashtag);
+        try {
+            return webClientBuilder
+                    .get()
+                    .uri(uriBuilder -> {
+                        UriBuilder builder = uriBuilder.path("/api/posts/filter");
+                        if (username != null && !username.isEmpty()) {
+                            builder.queryParam("username", username);
+                        }
+                        if (content != null && !content.isEmpty()) {
+                            builder.queryParam("content", content);
+                        }
+                        if (hashtag != null && !hashtag.isEmpty()) {
+                            builder.queryParam("hashtag", hashtag);
+                        }
+                        return builder.build();
+                    })
+                    .retrieve()
+                    .bodyToFlux(PostDTO.class)
+                    .collectList()
+                    .block();
+        } catch (Exception e) {
+            System.err.println("Error calling post service: " + e.getMessage());
+            e.printStackTrace();
+            return List.of();
+        }
     }
 
 

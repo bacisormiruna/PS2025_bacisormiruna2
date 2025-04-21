@@ -28,7 +28,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -51,7 +50,7 @@ public class PostService {
 
     public List<PostDTO> getAllPosts() {
         List<Post> posts = postRepository.findAllByOrderByCreatedAtDesc();
-        System.out.println("Found posts: " + posts.size()); // Log pentru a verifica câte postări sunt returnate
+        System.out.println("Found posts: " + posts.size());
         return posts.stream()
                 .map(postMapper::toDto)
                 .collect(Collectors.toList());
@@ -260,12 +259,18 @@ public class PostService {
     }
 
     public List<PostDTO> getFilteredPosts(String username, String content, String hashtag) {
+        String contentParam = content != null ? content : null;
         String normalizedHashtag = (hashtag != null && !hashtag.startsWith("#")) ? "#" + hashtag : hashtag;
+        System.out.println("Filtering with: username=" + username +
+                ", content=" + contentParam +
+                ", hashtag=" + normalizedHashtag);
 
         List<Post> posts = postRepository.findByFilters(
                 username,
-                content,
+                contentParam,
                 normalizedHashtag);
+
+        System.out.println("Found " + posts.size() + " posts");
 
         return posts.stream()
                 .map(postMapper::toDto)
