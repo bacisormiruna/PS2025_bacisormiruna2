@@ -1,13 +1,16 @@
 package com.example.demo.mapper;
 
+import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.hashtagdto.HashtagDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.entity.Hashtag;
 import com.example.demo.entity.Post;
+import org.hibernate.mapping.Set;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.stream.Collectors;
 
@@ -35,6 +38,20 @@ public class PostMapper {
                     .map(hashtag -> new HashtagDTO(hashtag.getId(), hashtag.getName()))
                     .collect(Collectors.toCollection(HashSet::new)));
         }
+        postDto.setComments(post.getComments() == null ?
+                new ArrayList<>() :
+                post.getComments().stream()
+                        .map(comment -> new CommentDTO(
+                                comment.getId(),
+                                comment.getAuthorId(),
+                                comment.getUsername(),
+                                comment.getContent(),
+                                comment.getCreatedAt()
+                        ))
+                        .collect(Collectors.toList())
+        );
+
+
         return postDto;
     }
 

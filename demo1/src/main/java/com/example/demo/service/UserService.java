@@ -4,6 +4,7 @@ import com.example.demo.builder.userbuilder.UserBuilder;
 import com.example.demo.builder.userbuilder.UserViewBuilder;
 import com.example.demo.dto.commentdto.CommentCreateDTO;
 import com.example.demo.dto.commentdto.CommentDTO;
+import com.example.demo.dto.frienddto.FriendDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.dto.userdto.UserDTO;
@@ -69,6 +70,7 @@ public class UserService{
 
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
+    private final FriendshipService friendshipService;
     private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
 
     @Autowired
@@ -413,7 +415,6 @@ public class UserService{
 
 
     public CommentDTO createCommentForPost(Long postId, CommentCreateDTO commentCreateDto, String token) {
-
         return webClientBuilder.post()
                 .uri("api/comments/addComment/{postId}", postId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -455,8 +456,18 @@ public class UserService{
             return List.of();
         }
     }
+    public List<PostDTO> getMyAndFriendsPosts(Long userId) throws UserException {
+        List<Long> friendIds = friendshipService.getFriendIds(userId);
+        friendIds.add(userId);  // adaugă și propriul ID
 
-
+        return webClientBuilder.post()
+                .uri("api/posts/publicByUserIds")  // ruta de pe microserviciul M2
+                .bodyValue(friendIds)     // trimitem lista de IDs
+                .retrieve()
+                .bodyToFlux(PostDTO.class)
+                .collectList()
+                .block();
+    }
 
 
 

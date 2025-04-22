@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.frienddto.FriendDTO;
+import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.entity.Friendship;
 import com.example.demo.entity.RequestStatus;
 import com.example.demo.entity.User;
@@ -148,5 +149,13 @@ public class FriendshipService {
         );
         return friendDTOs;
     }
+
+    public List<Long> getFriendIds(Long userId) throws UserException {
+        return getFriends(userId).stream()
+                .map(FriendDTO::getId)
+                .collect(Collectors.toList());
+    }
+
+
 }
 

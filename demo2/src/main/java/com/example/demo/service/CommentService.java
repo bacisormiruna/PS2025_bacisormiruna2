@@ -33,8 +33,10 @@ public class CommentService {
     public CommentDTO addComment(Long postId, CommentCreateDTO commentCreateDto, String username, Long userId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
+        if (!post.getIsPublic()) {//sa pot adauga comentarii doar la postarile publice (mai tarziu implementez si sa fie a prietenilor mei)
+            throw new IllegalStateException("You can only comment on public posts.");
+        }
         Comment comment = commentMapper.fromCreateDto(commentCreateDto);
-
         comment.setCreatedAt(LocalDateTime.now());
         comment.setUpdatedAt(LocalDateTime.now());
         comment.setPost(post);

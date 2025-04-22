@@ -210,12 +210,6 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
-//    public List<PostDTO> getPostsByUsername(String username) {
-//        return postRepository.findByUsername(username).stream()
-//                .map(postMapper::toDto)
-//                .collect(Collectors.toList());
-//    }
-
     @Transactional
     public List<PostDTO> getPostsByUsername(String username) {
         List<Post> posts = postRepository.findByUsernameOrderByCreatedAtDesc(username);
@@ -273,6 +267,13 @@ public class PostService {
         System.out.println("Found " + posts.size() + " posts");
 
         return posts.stream()
+                .map(postMapper::toDto)
+                .collect(Collectors.toList());
+    }
+
+    public List<PostDTO> findPublicPostsByUserIds(List<Long> userIds) {
+        return postRepository.findAllByAuthorIdInAndIsPublicFalse(userIds)
+                .stream()
                 .map(postMapper::toDto)
                 .collect(Collectors.toList());
     }

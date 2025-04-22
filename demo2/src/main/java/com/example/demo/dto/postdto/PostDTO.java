@@ -19,8 +19,8 @@ import java.util.Set;
 @AllArgsConstructor
 public class PostDTO {
     private Long id;
-    private Long authorId; // Schimbat din userId
-    private String username; // Adăugat pentru a corespunde entității
+    private Long authorId;
+    private String username;
     private String content;
     private String imageUrl;
     private Boolean isPublic;

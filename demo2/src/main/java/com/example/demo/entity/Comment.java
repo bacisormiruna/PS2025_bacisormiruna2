@@ -1,16 +1,11 @@
 package com.example.demo.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
-
 @Entity
-@Table(name = "comments", indexes = {
-        @Index(name = "idx_comment_post", columnList = "post_id"),
-        @Index(name = "idx_comment_created", columnList = "created_at")
-})
+@Table(name = "comments")
 @Data
 @Builder
 @NoArgsConstructor
@@ -38,12 +33,13 @@ public class Comment {
     @Column(name = "author_id", nullable = false)
     private Long authorId;
 
-    @ManyToOne(fetch = FetchType.LAZY) // LAZY este mai eficient
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id", nullable = false)
-    @JsonIgnore
+    @JsonBackReference
     private Post post;
 
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
-    }}
+    }
+}

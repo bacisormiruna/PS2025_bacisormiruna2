@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -311,8 +312,29 @@ public class UserController {
         return ResponseEntity.ok(posts);
     }
 
+    @GetMapping("/myfeed")
+    public ResponseEntity<List<PostDTO>> getMyAndFriendsFeed(@RequestHeader("Authorization") String authHeader) {
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ArrayList<>());
+            }
 
+            String token = authHeader.substring(7);
+            Long userId = jwtService.extractUserId(token);
 
+            if (userId == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ArrayList<>());
+            }
+            List<PostDTO> posts = userService.getMyAndFriendsPosts(userId);
+            posts.sort((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()));
+            return ResponseEntity.ok(posts);
+
+        } catch (UserException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ArrayList<>());
+        }
+    }
 
 
 }

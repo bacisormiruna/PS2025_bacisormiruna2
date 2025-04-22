@@ -10,7 +10,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -264,5 +263,10 @@ public class PostController {
         return ResponseEntity.ok(posts);
     }
 
+
+@PostMapping("/publicByUserIds")
+public List<PostDTO> getPublicPostsByUserIds(@RequestBody List<Long> userIds) {
+    return postService.findPublicPostsByUserIds(userIds);
+}
 
 }
