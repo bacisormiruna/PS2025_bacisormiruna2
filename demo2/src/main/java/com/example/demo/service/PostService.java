@@ -1,7 +1,5 @@
 package com.example.demo.service;
 
-import com.example.demo.dto.commentdto.CommentCreateDTO;
-import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.hashtagdto.HashtagDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
@@ -16,20 +14,15 @@ import com.example.demo.mapper.HashtagMapper;
 import com.example.demo.mapper.PostMapper;
 import com.example.demo.repository.HashtagRepository;
 import com.example.demo.repository.PostRepository;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
-import org.h2.mvstore.Page;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -39,21 +32,16 @@ import java.util.stream.Collectors;
 public class PostService {
     @Autowired
     private PostRepository postRepository;
-
     @Autowired
     private HashtagRepository hashtagRepository;
-    @Autowired
-    private JWTService jwtService;
-
     @Autowired
     private PostMapper postMapper;
     @Autowired
     private HashtagService hashtagService;
     @Autowired
-    private HashtagMapper hashtagMapper;
-
-    @Autowired
     private  WebClient webClientBuilder;
+    @Autowired
+    private  CommentService commentService;
 
     public List<PostDTO> getAllPosts() {
         List<Post> posts = postRepository.findAllByOrderByCreatedAtDesc();
@@ -62,27 +50,6 @@ public class PostService {
                 .map(postMapper::toDto)
                 .collect(Collectors.toList());
     }
-
-
-//    public PostDTO createPost1(Long userId, PostDTO postDto, MultipartFile imageFile) throws Exception {
-//        Post post = postMapper.toEntity(postDto);
-//        post.setCreatedAt(LocalDateTime.now());
-//        post.setAuthorId(userId);
-//
-//
-//        Set<Hashtag> hashtags = extractHashtags(postDto.getHashtags());
-//        System.out.println("Hashtags extrase: " +postDto.getHashtags());
-//        System.out.println("Hashtags extrase: " + hashtags);
-//
-//        post.setHashtags(hashtags);
-//        Post savedPost = postRepository.save(post);
-//
-//        if (imageFile != null && !imageFile.isEmpty()) {
-//            storeImage(savedPost.getId(), imageFile);
-//        }
-//        return postMapper.toDto(savedPost);
-//    }
-
 
     @Transactional
     public PostDTO createPost1(Long userId, String username, PostCreateDTO postCreateDto, MultipartFile imageFile) throws Exception {
@@ -312,18 +279,22 @@ public class PostService {
                 .block();
     }
 
-    // Metodă pentru a obține un post după id
     public Post findById(Long id) {
         return postRepository.findById(id)
                 .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + id)); // gestionează excepțiile
     }
 
-
     public PostDTO getPostWithReactions(Post post) {
         PostDTO dto = postMapper.toDto(post);
-        List<ReactionCountDTO> reactions = getReactionsForTarget(post.getId(), TargetType.POST);
-        dto.setReactions(reactions);
+        List<ReactionCountDTO> postReactions = getReactionsForTarget(post.getId(), TargetType.POST);
+        dto.setReactions(postReactions);
+
+        dto.setComments(post.getComments() == null ?
+                new ArrayList<>() :
+                post.getComments().stream()
+                        .map(commentService::toDtoWithReactions)
+                        .collect(Collectors.toList())
+        );
         return dto;
     }
-
 }

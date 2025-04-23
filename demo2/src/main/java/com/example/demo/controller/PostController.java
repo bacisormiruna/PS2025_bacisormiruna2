@@ -284,7 +284,7 @@ public class PostController {
 
     @GetMapping("/reactions/{id}")
     public ResponseEntity<PostDTO> getPostsWithReactions(@PathVariable Long id) {
-        Post post = postService.findById(id); // sau getById, cum ai tu metoda
+        Post post = postService.findById(id);
         PostDTO postDto = postService.getPostWithReactions(post);
         return ResponseEntity.ok(postDto);
     }

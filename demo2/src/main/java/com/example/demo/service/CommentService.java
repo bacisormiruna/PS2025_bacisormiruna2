@@ -2,9 +2,10 @@ package com.example.demo.service;
 
 import com.example.demo.dto.commentdto.CommentCreateDTO;
 import com.example.demo.dto.commentdto.CommentDTO;
-import com.example.demo.dto.postdto.PostDTO;
+import com.example.demo.dto.reactiondto.ReactionCountDTO;
 import com.example.demo.entity.Comment;
 import com.example.demo.entity.Post;
+import com.example.demo.enumeration.TargetType;
 import com.example.demo.errorhandler.CommentNotFoundException;
 import com.example.demo.errorhandler.PostNotFoundException;
 import com.example.demo.errorhandler.UnauthorizedException;
@@ -14,8 +15,10 @@ import com.example.demo.repository.PostRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class CommentService {
@@ -28,6 +31,9 @@ public class CommentService {
 
     @Autowired
     private CommentMapper commentMapper;
+
+    @Autowired
+    private WebClient webClientBuilder;
 
     @Transactional
     public CommentDTO addComment(Long postId, CommentCreateDTO commentCreateDto, String username, Long userId) {
@@ -84,5 +90,27 @@ public class CommentService {
 
         commentRepository.delete(comment);
     }
+
+    public List<ReactionCountDTO> getReactionsForTarget(Long targetId, TargetType targetType) {
+        return webClientBuilder.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/reactions/reactions")
+                        .queryParam("targetId", targetId)
+                        .queryParam("targetType", targetType)
+                        .build())
+                .retrieve()
+                .bodyToFlux(ReactionCountDTO.class)
+                .collectList()
+                .block();
+    }
+
+    public CommentDTO toDtoWithReactions(Comment comment) {
+        CommentDTO dto = commentMapper.toDto(comment);
+        List<ReactionCountDTO> reactions = getReactionsForTarget(comment.getId(), TargetType.COMMENT);
+        dto.setReactions(reactions);
+        return dto;
+    }
+
+
 
 }

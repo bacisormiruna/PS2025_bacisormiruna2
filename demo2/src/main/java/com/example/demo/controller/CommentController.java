@@ -2,9 +2,12 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.commentdto.CommentCreateDTO;
 import com.example.demo.dto.commentdto.CommentDTO;
+import com.example.demo.dto.reactiondto.ReactionCreateDTO;
+import com.example.demo.enumeration.TargetType;
 import com.example.demo.errorhandler.PostNotFoundException;
 import com.example.demo.service.CommentService;
 import com.example.demo.service.JWTService;
+import com.example.demo.service.PostService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -23,6 +26,8 @@ public class CommentController {
     private CommentService commentService;
     @Autowired
     private JWTService jwtService;
+    @Autowired
+    private PostService postService;
 
     @PostMapping(
             value = "/addComment/{postId}",
@@ -65,5 +70,14 @@ public class CommentController {
         String username = (String) request.getAttribute("username");
         commentService.deleteComment(commentId, username);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{commentId}/react")
+    public ResponseEntity<Void> reactToPost(@PathVariable Long commentId,
+                                            @RequestBody ReactionCreateDTO dto) {
+        dto.setTargetId(commentId);
+        dto.setTargetType(TargetType.COMMENT);
+        postService.sendReaction(dto);
+        return ResponseEntity.ok().build();
     }
 }
