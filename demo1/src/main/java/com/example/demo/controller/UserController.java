@@ -32,7 +32,6 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
-    private final WebClient webClientBuilder;
     private final JWTService jwtService;
 
     @RequestMapping(value = "/getAll", method = RequestMethod.GET)
@@ -256,26 +255,6 @@ public class UserController {
         }
     }
 
-
-    @PostMapping("/addComment/{postId}")
-    public ResponseEntity<?> addCommentThroughUserService(
-            @PathVariable Long postId,
-            @RequestBody CommentCreateDTO commentCreateDto,
-            @RequestHeader("Authorization") String authHeader) {
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
-        }
-
-        try {
-            CommentDTO createdComment = userService.createCommentForPost(postId, commentCreateDto, authHeader.substring(7));
-            return ResponseEntity.ok(createdComment);
-
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
-    }
-
     @PostMapping("/posts/{postId}/hashtags")
     public ResponseEntity<PostDTO> addHashtagsToUserPost(
             @PathVariable Long postId,
@@ -298,6 +277,66 @@ public class UserController {
         }
     }
 
+
+    @PostMapping("/addComment/{postId}")
+    public ResponseEntity<?> addCommentThroughUserService(
+            @PathVariable Long postId,
+            @RequestBody CommentCreateDTO commentCreateDto,
+            @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+
+        try {
+            CommentDTO createdComment = userService.createCommentForPost(postId, commentCreateDto, authHeader.substring(7));
+            return ResponseEntity.ok(createdComment);
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/updateComment/{postId}")
+    public ResponseEntity<?> updateCommentThroughUserService(
+            @PathVariable Long postId,
+            @RequestBody CommentCreateDTO commentCreateDto,
+            @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+
+        try {
+            CommentDTO createdComment = userService.updateCommentForPost(postId, commentCreateDto, authHeader.substring(7));
+            return ResponseEntity.ok(createdComment);
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/deleteComment/{commentId}")
+    public ResponseEntity<?> deleteCommentThroughUserService(
+            @PathVariable Long commentId,
+            @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+
+        try {
+            userService.deleteCommentFromPost(commentId, authHeader.substring(7));
+            return ResponseEntity.noContent().build();
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+
+
+
     @GetMapping("/filterPosts")
     public ResponseEntity<List<PostDTO>> filterPosts(
             @RequestParam(required = false) String username,
@@ -306,7 +345,6 @@ public class UserController {
         System.out.println("Filtering posts for username: " + username);
         System.out.println("Filtering posts for content: " + content);
         System.out.println("Filtering posts for hashtag: " + hashtag);
-
         List<PostDTO> posts = userService.filterPosts(username, content, hashtag);
         return ResponseEntity.ok(posts);
     }
@@ -318,10 +356,8 @@ public class UserController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(new ArrayList<>());
             }
-
             String token = authHeader.substring(7);
             Long userId = jwtService.extractUserId(token);
-
             if (userId == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(new ArrayList<>());
@@ -329,7 +365,6 @@ public class UserController {
             List<PostDTO> posts = userService.getMyAndFriendsPosts(userId);
             posts.sort((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()));
             return ResponseEntity.ok(posts);
-
         } catch (UserException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ArrayList<>());
         }

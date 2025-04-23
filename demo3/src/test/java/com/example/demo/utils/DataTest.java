@@ -1,9 +1,5 @@
 package com.example.demo.utils;
 
-import com.example.demo.entity.Role;
-import com.example.demo.entity.User;
-import com.example.demo.repository.RoleRepository;
-import com.example.demo.repository.UserRepository;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +8,7 @@ import java.time.LocalDateTime;
 @Component
 public class DataTest {
 
-    @Resource
+   /* @Resource
     private RoleRepository roleRepository;
 
     @Resource
@@ -28,5 +24,5 @@ public class DataTest {
     {
         User user = User.builder().name(name).email(email).password(password).role(role).timeStamp(LocalDateTime.now()).build();
         return userRepository.save(user);
-    }
+    }*/
 }

@@ -4,14 +4,19 @@ import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.hashtagdto.HashtagDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
+import com.example.demo.dto.reactiondto.ReactionCountDTO;
 import com.example.demo.entity.Hashtag;
 import com.example.demo.entity.Post;
+import com.example.demo.enumeration.TargetType;
+import com.example.demo.service.PostService;
 import org.hibernate.mapping.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.lang.System.currentTimeMillis;
@@ -23,6 +28,8 @@ public class PostMapper {
         if (post == null) {
             return null;
         }
+        //List<ReactionCountDTO> reactions = postService.getReactionsForTarget(post.getId(), TargetType.POST);
+
         PostDTO postDto = new PostDTO();
         postDto.setId(post.getId());
         postDto.setAuthorId(post.getAuthorId());
@@ -50,8 +57,7 @@ public class PostMapper {
                         ))
                         .collect(Collectors.toList())
         );
-
-
+       // postDto.setReactions(reactions);
         return postDto;
     }
 

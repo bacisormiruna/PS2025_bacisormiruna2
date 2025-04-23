@@ -1,10 +1,15 @@
 package com.example.demo.service;
 
+import com.example.demo.dto.commentdto.CommentCreateDTO;
+import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.hashtagdto.HashtagDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
+import com.example.demo.dto.reactiondto.ReactionCountDTO;
+import com.example.demo.dto.reactiondto.ReactionCreateDTO;
 import com.example.demo.entity.Hashtag;
 import com.example.demo.entity.Post;
+import com.example.demo.enumeration.TargetType;
 import com.example.demo.errorhandler.PostNotFoundException;
 import com.example.demo.errorhandler.UnauthorizedException;
 import com.example.demo.mapper.HashtagMapper;
@@ -15,15 +20,14 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.h2.mvstore.Page;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -47,6 +51,9 @@ public class PostService {
     private HashtagService hashtagService;
     @Autowired
     private HashtagMapper hashtagMapper;
+
+    @Autowired
+    private  WebClient webClientBuilder;
 
     public List<PostDTO> getAllPosts() {
         List<Post> posts = postRepository.findAllByOrderByCreatedAtDesc();
@@ -276,6 +283,47 @@ public class PostService {
                 .stream()
                 .map(postMapper::toDto)
                 .collect(Collectors.toList());
+    }
+
+    public void sendReaction(ReactionCreateDTO dto) {
+        webClientBuilder.post()
+                .uri("/api/reactions/react")
+//                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .bodyValue(dto)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(body -> Mono.error(new RuntimeException("Error from reaction service: " + body)))
+                )
+                .toBodilessEntity()
+                .block();
+    }
+
+    public List<ReactionCountDTO> getReactionsForTarget(Long targetId, TargetType targetType) {
+        return webClientBuilder.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/reactions/reactions")
+                        .queryParam("targetId", targetId)
+                        .queryParam("targetType", targetType)
+                        .build())
+                .retrieve()
+                .bodyToFlux(ReactionCountDTO.class)
+                .collectList()
+                .block();
+    }
+
+    // Metodă pentru a obține un post după id
+    public Post findById(Long id) {
+        return postRepository.findById(id)
+                .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + id)); // gestionează excepțiile
+    }
+
+
+    public PostDTO getPostWithReactions(Post post) {
+        PostDTO dto = postMapper.toDto(post);
+        List<ReactionCountDTO> reactions = getReactionsForTarget(post.getId(), TargetType.POST);
+        dto.setReactions(reactions);
+        return dto;
     }
 
 }

@@ -366,7 +366,7 @@ public class UserService{
     //sa adaug partea de getFeed
     public List<PostDTO> getPostsByUserFromOtherService(String username) {
         return webClientBuilder.get()
-                .uri("api/posts/user/{username}", username)  // Apelăm endpoint-ul din al doilea microserviciu
+                .uri("/api/posts/user/{username}", username)  // Apelăm endpoint-ul din al doilea microserviciu
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, response ->
                         response.bodyToMono(String.class)
@@ -382,7 +382,7 @@ public class UserService{
         try {
             return webClientBuilder.post()
                     .uri(uriBuilder -> uriBuilder
-                            .path("api/posts/{postId}/hashtags")
+                            .path("/api/posts/{postId}/hashtags")
                             .build(postId))
                     .header("Authorization", "Bearer " + token)
                     .bodyValue(hashtagsToParams(hashtags))
@@ -413,20 +413,6 @@ public class UserService{
     }
 
 
-
-    public CommentDTO createCommentForPost(Long postId, CommentCreateDTO commentCreateDto, String token) {
-        return webClientBuilder.post()
-                .uri("api/comments/addComment/{postId}", postId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .bodyValue(commentCreateDto)
-                .retrieve()
-                .onStatus(HttpStatusCode::is4xxClientError, clientResponse -> clientResponse.bodyToMono(String.class)
-                        .flatMap(errorBody -> Mono.error(new RuntimeException("Client error: " + errorBody))))
-                .onStatus(HttpStatusCode::is5xxServerError, clientResponse -> clientResponse.bodyToMono(String.class)
-                        .flatMap(errorBody -> Mono.error(new RuntimeException("Server error: " + errorBody))))
-                .bodyToMono(CommentDTO.class)
-                .block();
-    }
 
     public List<PostDTO> filterPosts(String username, String content, String hashtag) {
         System.out.println("UserService: Filtering posts with username=" + username + ", content=" + content + ", hashtag=" + hashtag);
@@ -461,13 +447,56 @@ public class UserService{
         friendIds.add(userId);  // adaugă și propriul ID
 
         return webClientBuilder.post()
-                .uri("api/posts/publicByUserIds")  // ruta de pe microserviciul M2
+                .uri("/api/posts/publicByUserIds")  // ruta de pe microserviciul M2
                 .bodyValue(friendIds)     // trimitem lista de IDs
                 .retrieve()
                 .bodyToFlux(PostDTO.class)
                 .collectList()
                 .block();
     }
+
+    public CommentDTO createCommentForPost(Long postId, CommentCreateDTO commentCreateDto, String token) {
+        return webClientBuilder.post()
+                .uri("/api/comments/addComment/{postId}", postId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .bodyValue(commentCreateDto)
+                .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, clientResponse -> clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> Mono.error(new RuntimeException("Client error: " + errorBody))))
+                .onStatus(HttpStatusCode::is5xxServerError, clientResponse -> clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> Mono.error(new RuntimeException("Server error: " + errorBody))))
+                .bodyToMono(CommentDTO.class)
+                .block();
+    }
+
+    public CommentDTO updateCommentForPost(Long postId, CommentCreateDTO commentCreateDto, String token) {
+        return webClientBuilder.put()
+                .uri("/api/comments/updateComment/{postId}", postId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .bodyValue(commentCreateDto)
+                .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, clientResponse -> clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> Mono.error(new RuntimeException("Client error: " + errorBody))))
+                .onStatus(HttpStatusCode::is5xxServerError, clientResponse -> clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> Mono.error(new RuntimeException("Server error: " + errorBody))))
+                .bodyToMono(CommentDTO.class)
+                .block();
+    }
+
+    public void deleteCommentFromPost(Long commentId, String token) {
+        webClientBuilder
+                .delete()
+                .uri("/api/comments/deleteComment/{commentId}", commentId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, clientResponse -> clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> Mono.error(new RuntimeException("Client error: " + errorBody))))
+                .onStatus(HttpStatusCode::is5xxServerError, clientResponse -> clientResponse.bodyToMono(String.class)
+                        .flatMap(errorBody -> Mono.error(new RuntimeException("Server error: " + errorBody))))
+                .toBodilessEntity()
+                .block();
+    }
+
 
 
 

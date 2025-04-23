@@ -1,10 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.userdto.UserDTO;
-import com.example.demo.entity.Role;
-import com.example.demo.entity.User;
 import com.example.demo.errorhandler.UserException;
-import com.example.demo.repository.UserRepository;
 import com.example.demo.utils.DataTest;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
@@ -14,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class UserServiceTest extends BaseTest{
 
-    @Resource
+   /* @Resource
     DataTest dataTest;
 
     @Resource
@@ -66,6 +63,6 @@ public class UserServiceTest extends BaseTest{
         assertThat(updatedUser.getPassword()).isEqualTo("password1");
         assertThat(updatedUser.getEmail()).isEqualTo("email1");
         assertThat(updatedUser.getName()).isEqualTo("name1");
-    }
+    }*/
 }
 

@@ -33,7 +33,7 @@ public class CommentService {
     public CommentDTO addComment(Long postId, CommentCreateDTO commentCreateDto, String username, Long userId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
-        if (!post.getIsPublic()) {//sa pot adauga comentarii doar la postarile publice (mai tarziu implementez si sa fie a prietenilor mei)
+        if (post.getIsPublic().equals(1)) {//sa pot adauga comentarii doar la postarile publice (mai tarziu implementez si sa fie a prietenilor mei)
             throw new IllegalStateException("You can only comment on public posts.");
         }
         Comment comment = commentMapper.fromCreateDto(commentCreateDto);
@@ -50,6 +50,7 @@ public class CommentService {
         return commentMapper.toDto(savedComment);
     }
 
+    @Transactional
     public CommentDTO updateComment(Long commentId, CommentCreateDTO commentCreateDto, String username) {
         Comment existingComment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new CommentNotFoundException("Comment not found with id: " + commentId));
@@ -59,21 +60,29 @@ public class CommentService {
         }
 
         existingComment.setContent(commentCreateDto.getContent());
-        if (commentCreateDto.getImageURL() != null ) {
+        existingComment.setUpdatedAt(LocalDateTime.now());
+
+        if (commentCreateDto.getImageURL() != null) {
             existingComment.setImageUrl(commentCreateDto.getImageURL());
+        } else {
+            existingComment.setImageUrl(null);
         }
 
         Comment updatedComment = commentRepository.save(existingComment);
         return commentMapper.toDto(updatedComment);
     }
 
+
+    @Transactional
     public void deleteComment(Long commentId, String username) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new CommentNotFoundException("Comment not found with id: " + commentId));
+
         if (!comment.getUsername().equals(username)) {
             throw new UnauthorizedException("You can only delete your own comments");
         }
 
         commentRepository.delete(comment);
     }
+
 }

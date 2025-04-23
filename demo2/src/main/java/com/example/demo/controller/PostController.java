@@ -2,6 +2,10 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
+import com.example.demo.dto.reactiondto.ReactionCountDTO;
+import com.example.demo.dto.reactiondto.ReactionCreateDTO;
+import com.example.demo.entity.Post;
+import com.example.demo.enumeration.TargetType;
 import com.example.demo.errorhandler.PostNotFoundException;
 import com.example.demo.errorhandler.UnauthorizedException;
 import com.example.demo.service.JWTService;
@@ -264,9 +268,24 @@ public class PostController {
     }
 
 
-@PostMapping("/publicByUserIds")
-public List<PostDTO> getPublicPostsByUserIds(@RequestBody List<Long> userIds) {
-    return postService.findPublicPostsByUserIds(userIds);
-}
+    @PostMapping("/publicByUserIds")
+    public List<PostDTO> getPublicPostsByUserIds(@RequestBody List<Long> userIds) {
+        return postService.findPublicPostsByUserIds(userIds);
+    }
 
+    @PostMapping("/{postId}/react")
+    public ResponseEntity<Void> reactToPost(@PathVariable Long postId,
+                                            @RequestBody ReactionCreateDTO dto) {
+        dto.setTargetId(postId);
+        dto.setTargetType(TargetType.POST);
+        postService.sendReaction(dto);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/reactions/{id}")
+    public ResponseEntity<PostDTO> getPostsWithReactions(@PathVariable Long id) {
+        Post post = postService.findById(id); // sau getById, cum ai tu metoda
+        PostDTO postDto = postService.getPostWithReactions(post);
+        return ResponseEntity.ok(postDto);
+    }
 }
