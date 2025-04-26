@@ -5,6 +5,7 @@ import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.reactiondto.ReactionCountDTO;
 import com.example.demo.entity.Comment;
 import com.example.demo.entity.Post;
+import com.example.demo.enumeration.NotificationType;
 import com.example.demo.enumeration.TargetType;
 import com.example.demo.errorhandler.CommentNotFoundException;
 import com.example.demo.errorhandler.PostNotFoundException;
@@ -16,7 +17,6 @@ import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -34,6 +34,9 @@ public class CommentService {
 
     @Autowired
     private WebClient webClientBuilder;
+
+    @Autowired
+    private NotificationSendService notificationSendService;
 
     @Transactional
     public CommentDTO addComment(Long postId, CommentCreateDTO commentCreateDto, String username, Long userId) {
@@ -78,18 +81,43 @@ public class CommentService {
         return commentMapper.toDto(updatedComment);
     }
 
-
     @Transactional
     public void deleteComment(Long commentId, String username) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new CommentNotFoundException("Comment not found with id: " + commentId));
 
+        System.out.println("Comment posted by: " + comment.getUsername());
+        System.out.println("Logged in user: " + username);  // Adaugă un log pentru a verifica
         if (!comment.getUsername().equals(username)) {
             throw new UnauthorizedException("You can only delete your own comments");
         }
-
         commentRepository.delete(comment);
     }
+
+//    @Transactional
+//    public void deleteCommentAsModerator(Long commentId) {
+//        Comment comment = commentRepository.findById(commentId)
+//                .orElseThrow(() -> new CommentNotFoundException("Comment not found with id: " + commentId));
+//        commentRepository.delete(comment);
+//    }
+
+    @Transactional
+    public void deleteCommentAsModerator(Long commentId, String username) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new CommentNotFoundException("Comment not found with id: " + commentId));
+        boolean isModeratorAction = !comment.getUsername().equals(username) && username.equals("Moderator");
+        Long authorId = comment.getAuthorId(); // Presupunem că există un authorId în Comment
+        commentRepository.delete(comment);
+
+        if (isModeratorAction) {
+            notificationSendService.sendNotification(
+                    authorId,
+                    "Your comment has been deleted by a moderator.",
+                    NotificationType.COMMENT_DELETED
+            );
+        }
+    }
+
 
     public List<ReactionCountDTO> getReactionsForTarget(Long targetId, TargetType targetType) {
         return webClientBuilder.get()
@@ -109,6 +137,12 @@ public class CommentService {
         List<ReactionCountDTO> reactions = getReactionsForTarget(comment.getId(), TargetType.COMMENT);
         dto.setReactions(reactions);
         return dto;
+    }
+
+    public CommentDTO getCommentById(Long id) {
+        Comment comment = commentRepository.findById(id)
+                .orElseThrow(() -> new CommentNotFoundException("Comment not found with id: " + id));
+        return commentMapper.toDto(comment);
     }
 
 

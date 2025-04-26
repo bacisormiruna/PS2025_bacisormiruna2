@@ -27,7 +27,6 @@ public class ReactionMapper {
         if (entity == null) {
             return null;
         }
-
         ReactionDTO dto = new ReactionDTO();
         dto.setId(entity.getId());
         dto.setUserId(entity.getUserId());

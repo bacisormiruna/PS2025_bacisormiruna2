@@ -3,6 +3,7 @@ package com.example.demo.dto.postdto;
 
 import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.hashtagdto.HashtagDTO;
+import com.example.demo.dto.reactiondto.ReactionCountDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,4 +28,5 @@ public class PostDTO {
     private LocalDateTime updatedAt;
     private List<CommentDTO> comments;
     private Set<HashtagDTO> hashtags;
+    private List<ReactionCountDTO> reactions;
 }

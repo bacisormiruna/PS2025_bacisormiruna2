@@ -5,13 +5,17 @@ import com.example.demo.builder.userbuilder.UserViewBuilder;
 import com.example.demo.dto.commentdto.CommentCreateDTO;
 import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.frienddto.FriendDTO;
+import com.example.demo.dto.notificationdto.NotificationDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
+import com.example.demo.dto.reactiondto.ReactionCreateDTO;
 import com.example.demo.dto.userdto.UserDTO;
 import com.example.demo.dto.userdto.UserViewDTO;
 import com.example.demo.entity.Role;
 import com.example.demo.entity.User;
 import com.example.demo.entity.UserPrincipal;
+import com.example.demo.enumeration.NotificationType;
+import com.example.demo.errorhandler.CommentNotFoundException;
 import com.example.demo.errorhandler.PostNotFoundException;
 import com.example.demo.errorhandler.UnauthorizedException;
 import com.example.demo.errorhandler.UserException;
@@ -30,10 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -48,6 +49,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
@@ -110,28 +113,24 @@ public class UserService{
 
     public Long createUser(UserDTO userDTO) throws UserException {
         List<String> errors = UserFieldValidator.validateInsertOrUpdate(userDTO);
-
         if(!errors.isEmpty())
         {
             throw new UserException(StringUtils.collectionToDelimitedString(errors, "\n"));
         }
-
         Optional<Role> role = roleRepository.findRoleByName(userDTO.getRoleName().toUpperCase());
-
         if (role.isEmpty()) {
             throw new UserException("Role not found with name field: " + userDTO.getRoleName().toUpperCase());
         }
-
         Optional<User> user = userRepository.findUserByEmail(userDTO.getEmail());
         if(user.isPresent() ){
             throw new UserException("User record does not permit duplicates for email field: " + userDTO.getEmail());
         }
-
         User userSave = UserBuilder.generateEntityFromDTO(userDTO, role.get());
         userSave.setPassword(encoder.encode(userSave.getPassword()));
-
         return userRepository.save(userSave).getId();
     }
+
+
 
     public User findByName(String name) {
         return userRepository.findByName(name);
@@ -343,15 +342,29 @@ public class UserService{
                 .block();
     }
 
-    //deletePost
     public void deletePost(Long postId, String username, Long userId, String authHeader) {
         try {
-            webClientBuilder.delete()
-                    .uri("/api/posts/" + postId)
-                    .header("Authorization", authHeader)
-                    .retrieve()
-                    .toBodilessEntity()
-                    .block();
+            String userRole = getUserRoleById(userId);
+            if (userRole.equals("moderator")) {
+                webClientBuilder.delete()
+                        .uri("/api/posts/" + postId)
+                        .header("Authorization", authHeader)
+                        .retrieve()
+                        .toBodilessEntity()
+                        .block();
+            } else {
+                PostDTO postDTO = getPostDTOById(postId);
+                if (postDTO.getUsername().equals(username)) {
+                    webClientBuilder.delete()
+                            .uri("/api/posts/" + postId)
+                            .header("Authorization", authHeader)
+                            .retrieve()
+                            .toBodilessEntity()
+                            .block();
+                } else {
+                    throw new UnauthorizedException("You can only delete your own posts");
+                }
+            }
         } catch (WebClientResponseException.NotFound e) {
             throw new PostNotFoundException("Post not found with id: " + postId);
         } catch (WebClientResponseException.Forbidden e) {
@@ -360,8 +373,6 @@ public class UserService{
             throw new RuntimeException("Error when deleting post: " + e.getMessage(), e);
         }
     }
-
-    //--sa adaug hashtaguri
 
     //sa adaug partea de getFeed
     public List<PostDTO> getPostsByUserFromOtherService(String username) {
@@ -411,8 +422,6 @@ public class UserService{
         params.put("hashtags", hashtags);
         return params;
     }
-
-
 
     public List<PostDTO> filterPosts(String username, String content, String hashtag) {
         System.out.println("UserService: Filtering posts with username=" + username + ", content=" + content + ", hashtag=" + hashtag);
@@ -483,21 +492,191 @@ public class UserService{
                 .block();
     }
 
-    public void deleteCommentFromPost(Long commentId, String token) {
+//    public void deleteCommentFromPost(Long commentId, String token) {
+//        webClientBuilder
+//                .delete()
+//                .uri("/api/comments/deleteComment/{commentId}", commentId)
+//                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+//                .retrieve()
+//                .onStatus(HttpStatusCode::is4xxClientError, clientResponse -> clientResponse.bodyToMono(String.class)
+//                        .flatMap(errorBody -> Mono.error(new RuntimeException("Client error: " + errorBody))))
+//                .onStatus(HttpStatusCode::is5xxServerError, clientResponse -> clientResponse.bodyToMono(String.class)
+//                        .flatMap(errorBody -> Mono.error(new RuntimeException("Server error: " + errorBody))))
+//                .toBodilessEntity()
+//                .block();
+//    }
+
+//    public void deleteCommentFromPost(Long commentId, String username, Long userId, String authHeader) {
+//        try {
+//            String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : null;
+//            if (token == null) {
+//                throw new UnauthorizedException("Missing or invalid token.");
+//            }
+//
+//            String userRole = getUserRoleById(userId);
+//            System.out.println("User role: " + userRole);
+//            if (userRole.equals("moderator")) {
+//                webClientBuilder
+//                        .delete()
+//                        .uri("/api/comments/deleteComment/" + commentId)
+//                        .header("Authorization", "Bearer " + token) // Trimis corect token-ul
+//                        .retrieve()
+//                        .toBodilessEntity()
+//                        .block();
+//                return;
+//            }
+//
+//            CommentDTO commentDTO = getCommentDTOById(commentId);
+//            if (commentDTO.getUsername().equals(username)) {
+//                webClientBuilder
+//                        .delete()
+//                        .uri("/api/comments/deleteComment/" + commentId)
+//                        .header("Authorization", "Bearer " + token) // Trimis corect token-ul
+//                        .retrieve()
+//                        .toBodilessEntity()
+//                        .block();
+//            } else {
+//                throw new UnauthorizedException("You can only delete your own comments");
+//            }
+//        } catch (WebClientResponseException.NotFound e) {
+//            throw new CommentNotFoundException("Comment not found with id: " + commentId);
+//        } catch (WebClientResponseException.Forbidden e) {
+//            throw new UnauthorizedException("You are not authorized to delete this comment");
+//        } catch (Exception e) {
+//            throw new RuntimeException("Error when deleting comment: " + e.getMessage(), e);
+//        }
+//    }
+
+    public void deleteCommentFromPost(Long commentId, String username, Long userId, String authHeader) {
+        try {
+            String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : null;
+            if (token == null) {
+                throw new UnauthorizedException("Missing or invalid token.");
+            }
+            String userRole = getUserRoleById(userId);
+            System.out.println("User role: " + userRole);
+
+            if (userRole.equals("moderator")) {
+                // Pentru moderatori, adăugăm parametrul moderatorAction=true
+                webClientBuilder
+                        .delete()
+                        .uri(uriBuilder -> uriBuilder
+                                .path("/api/comments/deleteComment/" + commentId)
+                                .queryParam("moderatorAction", "true")
+                                .build())
+                        .header("Authorization", "Bearer " + token)
+                        .retrieve()
+                        .toBodilessEntity()
+                        .block();
+                return;
+            }
+
+            // Pentru utilizatori normali, nu adăugăm parametrul moderatorAction
+            CommentDTO commentDTO = getCommentDTOById(commentId);
+            if (commentDTO.getUsername().equals(username)) {
+                webClientBuilder
+                        .delete()
+                        .uri("/api/comments/deleteComment/" + commentId)
+                        .header("Authorization", "Bearer " + token)
+                        .retrieve()
+                        .toBodilessEntity()
+                        .block();
+            } else {
+                throw new UnauthorizedException("You can only delete your own comments");
+            }
+        } catch (WebClientResponseException.NotFound e) {
+            throw new CommentNotFoundException("Comment not found with id: " + commentId);
+        } catch (WebClientResponseException.Forbidden e) {
+            throw new UnauthorizedException("You are not authorized to delete this comment");
+        } catch (Exception e) {
+            throw new RuntimeException("Error when deleting comment: " + e.getMessage(), e);
+        }
+    }
+
+
+    public void sendReactionToPost(Long postId, ReactionCreateDTO dto, String token) {
+        if (dto.getUserId() == null) {
+            Long userId = jwtService.extractUserId(token);
+            dto.setUserId(userId);
+        }
         webClientBuilder
-                .delete()
-                .uri("/api/comments/deleteComment/{commentId}", commentId)
+                .post()
+                .uri("/api/posts/{postId}/react", postId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .bodyValue(dto)
                 .retrieve()
-                .onStatus(HttpStatusCode::is4xxClientError, clientResponse -> clientResponse.bodyToMono(String.class)
-                        .flatMap(errorBody -> Mono.error(new RuntimeException("Client error: " + errorBody))))
-                .onStatus(HttpStatusCode::is5xxServerError, clientResponse -> clientResponse.bodyToMono(String.class)
-                        .flatMap(errorBody -> Mono.error(new RuntimeException("Server error: " + errorBody))))
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(body -> Mono.error(new RuntimeException("Error from post service: " + body)))
+                )
                 .toBodilessEntity()
                 .block();
     }
 
+    public PostDTO getPostWithReactions(Long postId, String token) {
+        return webClientBuilder
+                .get()
+                .uri("/api/posts/reactions/{id}", postId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(body -> Mono.error(new RuntimeException("Error from post service: " + body)))
+                )
+                .bodyToMono(PostDTO.class)
+                .block();
+    }
 
+    public List<PostDTO> getAllPostsWithReactions(String token) {
+        return webClientBuilder
+                .get()
+                .uri("/api/posts/getAllPostsWithReactions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(body -> Mono.error(new RuntimeException("Error from post service: " + body)))
+                )
+                .bodyToFlux(PostDTO.class)
+                .collectList()
+                .block();
+    }
+
+    public String getUserRoleById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return user.getRole().getName();
+    }
+
+    public PostDTO getPostDTOById(Long postId) {
+        return webClientBuilder.get()
+                .uri("/api/posts/{id}", postId)
+                .retrieve()
+                .bodyToMono(PostDTO.class)
+                .block();
+    }
+
+    public CommentDTO getCommentDTOById(Long commentId) {
+        return webClientBuilder.get()
+                .uri("/api/comments/{id}", commentId)
+             //   .header(HttpHeaders.AUTHORIZATION, "Bearer " + authToken) // Asigură-te că folosești tokenul corect
+                .retrieve()
+                .bodyToMono(CommentDTO.class)
+                .block();
+    }
+
+    public void sendNotification(Long userId, String message, NotificationType type) {
+        userRepository.findById(userId);
+        NotificationDTO notificationDTO = new NotificationDTO(userId, message, type);
+        webClientBuilder
+                .post()
+                .uri("/api/notifications")
+                .bodyValue(notificationDTO)
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
 
 
 

@@ -71,4 +71,7 @@ public class User {
             inverseJoinColumns = @JoinColumn(name = "friend_id"))
     private List<User> friends;
 
+    @Column(name = "blocked", nullable = false)
+    private boolean blocked = false;
+
 }

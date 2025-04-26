@@ -128,21 +128,16 @@ public class PostController {
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
-
             String token = authHeader.substring(7);
             String username = jwtService.extractUsername(token);
             if (username == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
-
             ObjectMapper objectMapper = new ObjectMapper();
             objectMapper.registerModule(new JavaTimeModule());
             PostCreateDTO postCreateDto = objectMapper.readValue(postCreateDtoJson, PostCreateDTO.class);
-
             PostDTO updatedPost = postService.updatePost(postId, postCreateDto, username, imageFile);
-
             return ResponseEntity.ok(updatedPost);
-
         } catch (PostNotFoundException e) {
             return ResponseEntity.notFound().build();
         } catch (UnauthorizedException e) {
@@ -273,19 +268,41 @@ public class PostController {
         return postService.findPublicPostsByUserIds(userIds);
     }
 
+
     @PostMapping("/{postId}/react")
     public ResponseEntity<Void> reactToPost(@PathVariable Long postId,
-                                            @RequestBody ReactionCreateDTO dto) {
+                                            @RequestBody ReactionCreateDTO dto,
+                                            @RequestHeader("Authorization") String authHeader) {
         dto.setTargetId(postId);
         dto.setTargetType(TargetType.POST);
-        postService.sendReaction(dto);
+
+        postService.sendReaction(dto, authHeader);
         return ResponseEntity.ok().build();
     }
 
+
+    //a post with id with its reactions
     @GetMapping("/reactions/{id}")
     public ResponseEntity<PostDTO> getPostsWithReactions(@PathVariable Long id) {
         Post post = postService.findById(id);
         PostDTO postDto = postService.getPostWithReactions(post);
         return ResponseEntity.ok(postDto);
     }
+
+    //all the posts with the reactions and the number of reactions
+    @GetMapping("/getAllPostsWithReactions")
+    public ResponseEntity<?> getAllPostsWithReactions(
+            @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+
+        try {
+            List<PostDTO> posts = postService.getAllPostsWithReactions();
+            return ResponseEntity.ok(posts);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
 }

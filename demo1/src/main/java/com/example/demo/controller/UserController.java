@@ -4,6 +4,7 @@ import com.example.demo.dto.commentdto.CommentCreateDTO;
 import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
+import com.example.demo.dto.reactiondto.ReactionCreateDTO;
 import com.example.demo.dto.userdto.UserDTO;
 import com.example.demo.entity.User;
 import com.example.demo.errorhandler.PostNotFoundException;
@@ -18,7 +19,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
@@ -209,8 +209,6 @@ public class UserController {
         }
     }
 //stergerea unei postari
-
-
     @DeleteMapping("/posts/{postId}")
     public ResponseEntity<?> deletePost(
             @PathVariable Long postId,
@@ -277,7 +275,6 @@ public class UserController {
         }
     }
 
-
     @PostMapping("/addComment/{postId}")
     public ResponseEntity<?> addCommentThroughUserService(
             @PathVariable Long postId,
@@ -316,26 +313,44 @@ public class UserController {
         }
     }
 
+//    @DeleteMapping("/deleteComment/{commentId}")
+//    public ResponseEntity<?> deleteCommentThroughUserService(
+//            @PathVariable Long commentId,
+//            @RequestHeader("Authorization") String authHeader) {
+//
+//        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+//        }
+//
+//        try {
+//            userService.deleteCommentFromPost(commentId, authHeader.substring(7));
+//            return ResponseEntity.noContent().build();
+//
+//        } catch (RuntimeException e) {
+//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+//        }
+//    }
+
     @DeleteMapping("/deleteComment/{commentId}")
-    public ResponseEntity<?> deleteCommentThroughUserService(
+    public ResponseEntity<?> deleteCommentForUser(
             @PathVariable Long commentId,
             @RequestHeader("Authorization") String authHeader) {
-
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
         }
-
         try {
-            userService.deleteCommentFromPost(commentId, authHeader.substring(7));
+            String token = authHeader.substring(7);
+            String username = jwtService.extractUsername(token);
+            Long userId = jwtService.extractUserId(token);
+            System.out.println("Extracted username: " + username);  // Adaugă un log pentru a verifica
+            System.out.println("Extracted userId: " + userId);
+            userService.deleteCommentFromPost(commentId, username, userId, authHeader);
             return ResponseEntity.noContent().build();
 
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
-
-
-
 
     @GetMapping("/filterPosts")
     public ResponseEntity<List<PostDTO>> filterPosts(
@@ -367,6 +382,57 @@ public class UserController {
             return ResponseEntity.ok(posts);
         } catch (UserException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ArrayList<>());
+        }
+    }
+
+    @PostMapping("/reactToPost/{postId}")
+    public ResponseEntity<?> reactToPostThroughUserService(
+            @PathVariable Long postId,
+            @RequestBody ReactionCreateDTO reactionCreateDto,
+            @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+
+        try {
+            String token = authHeader.substring(7);
+            userService.sendReactionToPost(postId, reactionCreateDto, token);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/getPostWithReactions/{postId}")
+    public ResponseEntity<?> getPostWithReactionsThroughUserService(
+            @PathVariable Long postId,
+            @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+
+        try {
+            String token = authHeader.substring(7);
+            PostDTO postWithReactions = userService.getPostWithReactions(postId, token);
+            return ResponseEntity.ok(postWithReactions);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/getAllPostsWithReactions")
+    public ResponseEntity<?> getAllPostsWithReactionsThroughUserService(
+            @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+
+        try {
+            String token = authHeader.substring(7);
+            List<PostDTO> posts = userService.getAllPostsWithReactions(token);
+            return ResponseEntity.ok(posts);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
 }

@@ -1,14 +1,27 @@
 package com.example.demo.controller;
 
+import com.example.demo.builder.userbuilder.UserBuilder;
 import com.example.demo.dto.userdto.UserDTO;
+import com.example.demo.entity.Role;
+import com.example.demo.entity.User;
 import com.example.demo.errorhandler.UserException;
+import com.example.demo.repository.RoleRepository;
+import com.example.demo.repository.UserRepository;
+import com.example.demo.service.AdminService;
+import com.example.demo.service.JWTService;
 import com.example.demo.service.UserService;
+import com.example.demo.validator.UserFieldValidator;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Optional;
 
 @RestController
 @CrossOrigin
@@ -17,6 +30,12 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController{
 
     private final UserService userService;
+    private final AdminService adminService;
+    private final JWTService jwtService;
+    private final RoleRepository roleRepository;
+    private final UserRepository userRepository;
+    private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
+
 
     @RequestMapping(value = "/getAll", method = RequestMethod.GET)
     public ResponseEntity<?> displayAllUserView(){
@@ -62,5 +81,53 @@ public class AdminController{
     public ResponseEntity<?> changeUserRole(@PathVariable("id") Long id, @PathVariable("role") String role) throws UserException {
         userService.changeUserRole(id, role);
         return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @PostMapping(value = "/createUserOrModerator", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity createUserOrModerator(@RequestBody UserDTO userDTO,
+                                                @RequestHeader("Authorization") String token) {
+        try {
+            if (token == null || !token.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token missing or invalid format");
+            }
+            String extractedToken = token.substring(7);
+            System.out.println("Extracted token: " + extractedToken); // Debugging print
+            String username = jwtService.extractUsername(extractedToken);
+            System.out.println("Extracted username: " + username); // Debugging print
+
+            if (username == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
+            }
+
+            User currentUser = userRepository.findByName(username);
+            if (currentUser == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found");
+            }
+            Role currentRole = currentUser.getRole();
+            if (currentRole == null || !currentRole.getName().equalsIgnoreCase("admin")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You must be an admin to create a moderator");
+            }
+
+            List<String> errors = UserFieldValidator.validateInsertOrUpdate(userDTO);
+            if (!errors.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(StringUtils.collectionToDelimitedString(errors, "\n"));
+            }
+            Optional<Role> role = roleRepository.findRoleByName(userDTO.getRoleName().toUpperCase());
+            if (role.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Role not found with name field: " + userDTO.getRoleName().toUpperCase());
+            }
+            Optional<User> existingUser = userRepository.findUserByEmail(userDTO.getEmail());
+            if (existingUser.isPresent()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User already exists with email: " + userDTO.getEmail());
+            }
+            User userToSave = UserBuilder.generateEntityFromDTO(userDTO, role.get());
+            userToSave.setPassword(encoder.encode(userToSave.getPassword()));
+            Long userId = userRepository.save(userToSave).getId();
+            return ResponseEntity.status(HttpStatus.CREATED).body(userId);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.demo.service;
 
+import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.hashtagdto.HashtagDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
@@ -7,12 +8,11 @@ import com.example.demo.dto.reactiondto.ReactionCountDTO;
 import com.example.demo.dto.reactiondto.ReactionCreateDTO;
 import com.example.demo.entity.Hashtag;
 import com.example.demo.entity.Post;
+import com.example.demo.enumeration.NotificationType;
 import com.example.demo.enumeration.TargetType;
 import com.example.demo.errorhandler.PostNotFoundException;
 import com.example.demo.errorhandler.UnauthorizedException;
-import com.example.demo.mapper.HashtagMapper;
 import com.example.demo.mapper.PostMapper;
-import com.example.demo.repository.HashtagRepository;
 import com.example.demo.repository.PostRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,18 +22,13 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class PostService {
     @Autowired
     private PostRepository postRepository;
-    @Autowired
-    private HashtagRepository hashtagRepository;
     @Autowired
     private PostMapper postMapper;
     @Autowired
@@ -42,6 +37,8 @@ public class PostService {
     private  WebClient webClientBuilder;
     @Autowired
     private  CommentService commentService;
+    @Autowired
+    private NotificationSendService notificationSendService;
 
     public List<PostDTO> getAllPosts() {
         List<Post> posts = postRepository.findAllByOrderByCreatedAtDesc();
@@ -88,11 +85,9 @@ public class PostService {
     public PostDTO updatePost(Long postId, PostCreateDTO postCreateDto, String username, MultipartFile imageFile) throws Exception {
         Post existingPost = postRepository.findById(postId)
                 .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
-
         if (!existingPost.getUsername().equals(username)) {
             throw new UnauthorizedException("You can only update your own posts");
         }
-
         existingPost.setContent(postCreateDto.getContent());
         existingPost.setUpdatedAt(LocalDateTime.now());
         existingPost.setIsPublic(postCreateDto.getIsPublic());
@@ -117,65 +112,46 @@ public class PostService {
         return postMapper.toDto(updatedPost);
     }
 
+
+//    @Transactional
+//    public void deletePost(Long postId, String username) {
+//        Post post = postRepository.findById(postId)
+//                .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
+//
+//        if (!post.getUsername().equals(username) && !username.equals("Moderator")) {
+//            throw new UnauthorizedException("You can only delete your own posts or posts as a moderator");
+//        }
+//        post.getHashtags().clear();
+//        postRepository.saveAndFlush(post);
+//        postRepository.delete(post);
+//
+//    }
+
     @Transactional
     public void deletePost(Long postId, String username) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
-
-        if (!post.getUsername().equals(username)) {
-            throw new UnauthorizedException("You can only delete your own posts");
+        boolean isModeratorAction = !post.getUsername().equals(username) && username.equals("Moderator");
+        if (!post.getUsername().equals(username) && !username.equals("Moderator")) {
+            throw new UnauthorizedException("You can only delete your own posts or posts as a moderator");
         }
-
+        Long authorId = post.getAuthorId();
         post.getHashtags().clear();
         postRepository.saveAndFlush(post);
-
         postRepository.delete(post);
+        if (isModeratorAction) {
+            notificationSendService.sendNotification(
+                    authorId,
+                    "Your post has been deleted by a moderator.",
+                    NotificationType.POST_DELETED
+            );
+        }
     }
 
     public List<PostDTO> getPostsByHashtag(String hashtagName) {
         return postRepository.findByHashtagName(hashtagName).stream()
                 .map(postMapper::toDto)
                 .collect(Collectors.toList());
-    }
-
-    @Transactional
-    protected Set<Hashtag> extractHashtags(Set<HashtagDTO> hashtagsDTO) {
-        Set<Hashtag> hashtags = new HashSet<>();
-        if (hashtagsDTO == null) {
-            return hashtags;
-        }
-
-        for (HashtagDTO hashtagDTO : hashtagsDTO) {
-            String hashtagName = hashtagDTO.getName();
-            if (hashtagName == null || hashtagName.trim().isEmpty()) {
-                continue;
-            }
-            if (!hashtagName.startsWith("#")) {
-                hashtagName = "#" + hashtagName;
-            }
-
-            Hashtag hashtag = null;
-            try {
-                hashtag = hashtagRepository.findByName(hashtagName)
-                        .orElse(null);
-            } catch (Exception e) {
-                System.err.println("Error finding hashtag: " + e.getMessage());
-            }
-
-            if (hashtag == null) {
-                try {
-                    hashtag = new Hashtag();
-                    hashtag.setName(hashtagName);
-                    hashtag = hashtagRepository.save(hashtag);
-                    System.out.println("Created new hashtag with ID: " + hashtag.getId());
-                } catch (Exception e) {
-                    System.err.println("Error creating hashtag: " + e.getMessage());
-                    continue;
-                }
-            }
-            hashtags.add(hashtag);
-        }
-        return hashtags;
     }
 
     public List<PostDTO> searchPosts(String query) {
@@ -218,7 +194,6 @@ public class PostService {
                 newHashtags.add(hashtag);
             }
         }
-
         post.getHashtags().addAll(newHashtags);
         post.setUpdatedAt(LocalDateTime.now());
         Post updatedPost = postRepository.save(post);
@@ -252,10 +227,12 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
-    public void sendReaction(ReactionCreateDTO dto) {
-        webClientBuilder.post()
-                .uri("/api/reactions/react")
-//                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+    @Transactional
+    public void sendReaction(ReactionCreateDTO dto, String token) {
+        webClientBuilder
+                .post()
+                .uri("api/reactions/react") // reaction-service
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .bodyValue(dto)
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, response ->
@@ -289,12 +266,34 @@ public class PostService {
         List<ReactionCountDTO> postReactions = getReactionsForTarget(post.getId(), TargetType.POST);
         dto.setReactions(postReactions);
 
-        dto.setComments(post.getComments() == null ?
-                new ArrayList<>() :
-                post.getComments().stream()
-                        .map(commentService::toDtoWithReactions)
-                        .collect(Collectors.toList())
-        );
+        List<CommentDTO> sortedComments = post.getComments() == null
+                ? new ArrayList<>()
+                : post.getComments().stream()
+                .map(commentService::toDtoWithReactions)
+                .sorted(Comparator.comparingInt(
+                        c -> {
+                            int reactionCount = 0;
+                            if (c.getReactions() != null) {
+                                reactionCount = (int) c.getReactions().stream()
+                                        .mapToLong(ReactionCountDTO::getCount)
+                                        .sum();
+                            }
+                            return reactionCount;
+                        }
+                ))
+                .collect(Collectors.toList());
+
+        dto.setComments(sortedComments);
         return dto;
+    }
+
+    public List<PostDTO> getAllPostsWithReactions() {
+        List<Post> posts = postRepository.findAll();
+
+        return posts.stream()
+                .filter(post -> !post.getIsPublic())
+                .sorted((post1, post2) -> post2.getCreatedAt().compareTo(post1.getCreatedAt()))
+                .map(this::getPostWithReactions)
+                .collect(Collectors.toList());
     }
 }

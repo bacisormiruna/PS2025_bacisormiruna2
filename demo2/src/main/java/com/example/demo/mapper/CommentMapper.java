@@ -36,7 +36,6 @@ public class CommentMapper {
         comment.setUpdatedAt(commentDto.getUpdatedAt());
         comment.setUsername(commentDto.getUsername());
         comment.setAuthorId(commentDto.getAuthorId());
-
         return comment;
     }
 
