@@ -45,6 +45,7 @@ public class CommentMapper {
         }
         Comment comment = new Comment();
         comment.setContent(commentCreateDto.getContent());
+        comment.setImageUrl(commentCreateDto.getImageUrl());
         return comment;
     }
 }

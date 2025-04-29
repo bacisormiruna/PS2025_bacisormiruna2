@@ -453,11 +453,10 @@ public class UserService{
     }
     public List<PostDTO> getMyAndFriendsPosts(Long userId) throws UserException {
         List<Long> friendIds = friendshipService.getFriendIds(userId);
-        friendIds.add(userId);  // adaugă și propriul ID
-
+        friendIds.add(userId);
         return webClientBuilder.post()
-                .uri("/api/posts/publicByUserIds")  // ruta de pe microserviciul M2
-                .bodyValue(friendIds)     // trimitem lista de IDs
+                .uri("/api/posts/publicByUserIds")
+                .bodyValue(friendIds)
                 .retrieve()
                 .bodyToFlux(PostDTO.class)
                 .collectList()
@@ -492,60 +491,6 @@ public class UserService{
                 .block();
     }
 
-//    public void deleteCommentFromPost(Long commentId, String token) {
-//        webClientBuilder
-//                .delete()
-//                .uri("/api/comments/deleteComment/{commentId}", commentId)
-//                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-//                .retrieve()
-//                .onStatus(HttpStatusCode::is4xxClientError, clientResponse -> clientResponse.bodyToMono(String.class)
-//                        .flatMap(errorBody -> Mono.error(new RuntimeException("Client error: " + errorBody))))
-//                .onStatus(HttpStatusCode::is5xxServerError, clientResponse -> clientResponse.bodyToMono(String.class)
-//                        .flatMap(errorBody -> Mono.error(new RuntimeException("Server error: " + errorBody))))
-//                .toBodilessEntity()
-//                .block();
-//    }
-
-//    public void deleteCommentFromPost(Long commentId, String username, Long userId, String authHeader) {
-//        try {
-//            String token = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : null;
-//            if (token == null) {
-//                throw new UnauthorizedException("Missing or invalid token.");
-//            }
-//
-//            String userRole = getUserRoleById(userId);
-//            System.out.println("User role: " + userRole);
-//            if (userRole.equals("moderator")) {
-//                webClientBuilder
-//                        .delete()
-//                        .uri("/api/comments/deleteComment/" + commentId)
-//                        .header("Authorization", "Bearer " + token) // Trimis corect token-ul
-//                        .retrieve()
-//                        .toBodilessEntity()
-//                        .block();
-//                return;
-//            }
-//
-//            CommentDTO commentDTO = getCommentDTOById(commentId);
-//            if (commentDTO.getUsername().equals(username)) {
-//                webClientBuilder
-//                        .delete()
-//                        .uri("/api/comments/deleteComment/" + commentId)
-//                        .header("Authorization", "Bearer " + token) // Trimis corect token-ul
-//                        .retrieve()
-//                        .toBodilessEntity()
-//                        .block();
-//            } else {
-//                throw new UnauthorizedException("You can only delete your own comments");
-//            }
-//        } catch (WebClientResponseException.NotFound e) {
-//            throw new CommentNotFoundException("Comment not found with id: " + commentId);
-//        } catch (WebClientResponseException.Forbidden e) {
-//            throw new UnauthorizedException("You are not authorized to delete this comment");
-//        } catch (Exception e) {
-//            throw new RuntimeException("Error when deleting comment: " + e.getMessage(), e);
-//        }
-//    }
 
     public void deleteCommentFromPost(Long commentId, String username, Long userId, String authHeader) {
         try {
@@ -557,7 +502,6 @@ public class UserService{
             System.out.println("User role: " + userRole);
 
             if (userRole.equals("moderator")) {
-                // Pentru moderatori, adăugăm parametrul moderatorAction=true
                 webClientBuilder
                         .delete()
                         .uri(uriBuilder -> uriBuilder
@@ -571,7 +515,6 @@ public class UserService{
                 return;
             }
 
-            // Pentru utilizatori normali, nu adăugăm parametrul moderatorAction
             CommentDTO commentDTO = getCommentDTOById(commentId);
             if (commentDTO.getUsername().equals(username)) {
                 webClientBuilder

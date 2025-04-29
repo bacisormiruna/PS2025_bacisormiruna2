@@ -52,8 +52,8 @@ public class CommentService {
         comment.setUsername(username);
         comment.setAuthorId(userId);
 
-        if (commentCreateDto.getImageURL() != null ) {
-            comment.setImageUrl(commentCreateDto.getImageURL());
+        if (commentCreateDto.getImageUrl() != null ) {
+            comment.setImageUrl(commentCreateDto.getImageUrl());
         }
         Comment savedComment = commentRepository.save(comment);
         return commentMapper.toDto(savedComment);
@@ -71,8 +71,8 @@ public class CommentService {
         existingComment.setContent(commentCreateDto.getContent());
         existingComment.setUpdatedAt(LocalDateTime.now());
 
-        if (commentCreateDto.getImageURL() != null) {
-            existingComment.setImageUrl(commentCreateDto.getImageURL());
+        if (commentCreateDto.getImageUrl() != null) {
+            existingComment.setImageUrl(commentCreateDto.getImageUrl());
         } else {
             existingComment.setImageUrl(null);
         }
@@ -93,13 +93,6 @@ public class CommentService {
         }
         commentRepository.delete(comment);
     }
-
-//    @Transactional
-//    public void deleteCommentAsModerator(Long commentId) {
-//        Comment comment = commentRepository.findById(commentId)
-//                .orElseThrow(() -> new CommentNotFoundException("Comment not found with id: " + commentId));
-//        commentRepository.delete(comment);
-//    }
 
     @Transactional
     public void deleteCommentAsModerator(Long commentId, String username) {

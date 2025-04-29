@@ -20,5 +20,5 @@ public class CommentCreateDTO {
     @NotNull(message = "Post ID cannot be null")
     private Long postId;
 
-    private String imageURL;
+    private String imageUrl;
 }

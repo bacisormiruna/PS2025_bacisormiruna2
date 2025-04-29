@@ -227,21 +227,40 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
-    @Transactional
-    public void sendReaction(ReactionCreateDTO dto, String token) {
-        webClientBuilder
-                .post()
-                .uri("api/reactions/react") // reaction-service
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .bodyValue(dto)
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, response ->
-                        response.bodyToMono(String.class)
-                                .flatMap(body -> Mono.error(new RuntimeException("Error from reaction service: " + body)))
-                )
-                .toBodilessEntity()
-                .block();
-    }
+//    @Transactional
+//    public void sendReaction(ReactionCreateDTO dto, String token) {
+//        webClientBuilder
+//                .post()
+//                .uri("/api/reactions/react") // reaction-service
+//                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+//                .bodyValue(dto)
+//                .retrieve()
+//                .onStatus(HttpStatusCode::isError, response ->
+//                        response.bodyToMono(String.class)
+//                                .flatMap(body -> Mono.error(new RuntimeException("Error from reaction service: " + body)))
+//                )
+//                .toBodilessEntity()
+//                .block();
+//    }
+@Transactional
+public void sendReaction(ReactionCreateDTO dto, String token) {
+    // elimină prefixul dacă este deja prezent
+    String cleanedToken = token.startsWith("Bearer ") ? token.substring(7) : token;
+
+    webClientBuilder
+            .post()
+            .uri("/api/reactions/react") // reaction-service
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + cleanedToken)
+            .bodyValue(dto)
+            .retrieve()
+            .onStatus(HttpStatusCode::isError, response ->
+                    response.bodyToMono(String.class)
+                            .flatMap(body -> Mono.error(new RuntimeException("Error from reaction service: " + body)))
+            )
+            .toBodilessEntity()
+            .block();
+}
+
 
     public List<ReactionCountDTO> getReactionsForTarget(Long targetId, TargetType targetType) {
         return webClientBuilder.get()

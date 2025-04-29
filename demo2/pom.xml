@@ -111,6 +111,14 @@
 			<version>0.0.1</version>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-resolver-dns-native-macos</artifactId>
+			<version>4.1.100.Final</version> <!-- sau o versiune compatibilă cu restul Netty -->
+			<classifier>osx-aarch_64</classifier> <!-- pentru Mac M1/M2 -->
+		</dependency>
+
 		<dependency>
 			<groupId>com.example</groupId>
 			<artifactId>demo</artifactId>
