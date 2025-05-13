@@ -2,8 +2,8 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
-import com.example.demo.dto.reactiondto.ReactionCountDTO;
 import com.example.demo.dto.reactiondto.ReactionCreateDTO;
+import com.example.demo.dto.reactiondto.TotalReactionsDTO;
 import com.example.demo.entity.Post;
 import com.example.demo.enumeration.TargetType;
 import com.example.demo.errorhandler.PostNotFoundException;
@@ -50,45 +50,6 @@ public class PostController {
         System.out.println("Posts in controller: " + posts.size());
         return ResponseEntity.ok(posts);
     }
-
-    //asta e buna pentru varianta clasica primul request de create1
-//    @PostMapping
-//    public ResponseEntity<PostDTO> createPost(
-//            @RequestPart("postDto") PostDTO postDto,
-//            @RequestPart("image") MultipartFile imageFile) throws Exception {
-//        PostDTO savedPost = postService.createPost(postDto, imageFile);
-//        return ResponseEntity.ok(savedPost);
-//    }
-
-    // Endpoint pentru crearea unei postări
-//    @PostMapping
-//    public ResponseEntity<PostDTO> createPost(@RequestBody PostDTO postDTO,
-//                                              @RequestParam(value = "image", required = false) MultipartFile imageFile) throws Exception {
-//        PostDTO createdPost = postService.createPost1(1L, postDTO, imageFile); // presupunem că userId = 1L
-//        return ResponseEntity.ok(createdPost);
-//    }
-
-//    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-//    public ResponseEntity<PostDTO> createPost(
-//            @RequestPart("postDto") String postDtoJson,
-//            @RequestPart(value = "image", required = false) MultipartFile imageFile) throws Exception {
-//        try {
-//            ObjectMapper objectMapper = new ObjectMapper();
-//            objectMapper.registerModule(new JavaTimeModule());
-//            objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-//
-//            PostDTO postDTO = objectMapper.readValue(postDtoJson, PostDTO.class);
-////pun 0 la userId ca sa nu mai fac request la baza de date
-//            PostDTO createdPost = postService.createPost1(postDTO, imageFile);
-//            System.out.println("Hashtags for the post: " + createdPost.getHashtags());
-//            return ResponseEntity.ok(createdPost);
-//
-//
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            throw new RuntimeException("Error creating post: " + e.getMessage());
-//        }
-//    }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<PostDTO> createPost(
@@ -269,7 +230,7 @@ public class PostController {
     }
 
 
-    @PostMapping("/{postId}/react")
+    @PostMapping("/{postId}/reactToPost")
     public ResponseEntity<Void> reactToPost(@PathVariable Long postId,
                                             @RequestBody ReactionCreateDTO dto,
                                             @RequestHeader("Authorization") String authHeader) {
@@ -280,8 +241,17 @@ public class PostController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/{commentId}/reactToComm")
+    public ResponseEntity<Void> reactToComment(@PathVariable Long commentId,
+                                            @RequestBody ReactionCreateDTO dto,
+                                            @RequestHeader("Authorization") String authHeader) {
+        dto.setTargetId(commentId);
+        dto.setTargetType(TargetType.COMMENT);
 
-    //a post with id with its reactions
+        postService.sendReaction(dto, authHeader);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/reactions/{id}")
     public ResponseEntity<PostDTO> getPostsWithReactions(@PathVariable Long id) {
         Post post = postService.findById(id);
@@ -289,14 +259,12 @@ public class PostController {
         return ResponseEntity.ok(postDto);
     }
 
-    //all the posts with the reactions and the number of reactions
     @GetMapping("/getAllPostsWithReactions")
     public ResponseEntity<?> getAllPostsWithReactions(
             @RequestHeader("Authorization") String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
         }
-
         try {
             List<PostDTO> posts = postService.getAllPostsWithReactions();
             return ResponseEntity.ok(posts);
@@ -304,5 +272,23 @@ public class PostController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
+
+    @GetMapping("/{postId}/reactions/total")
+    public ResponseEntity<TotalReactionsDTO> getTotalReactions(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable Long postId) {
+        TotalReactionsDTO totalReactions = postService.computeTotalReactions(postId);
+        return ResponseEntity.ok(totalReactions);
+    }
+
+    @GetMapping("/posts/exists/{id}")
+    public ResponseEntity<Boolean> checkPostExists(@PathVariable Long id) {
+        boolean exists = postService.existsById(id);
+        return ResponseEntity.ok(exists);
+    }
+
+
+
+
 
 }

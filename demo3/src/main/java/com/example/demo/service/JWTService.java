@@ -1,6 +1,8 @@
 package com.example.demo.service;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -36,14 +38,14 @@ public class JWTService {
                 .getBody();
     }
 
-public String extractUsername(String token) {
-    System.out.println("Extracting username for token: {}"+ token);
-    return Jwts.parser()
-            .setSigningKey(getKey())
-            .parseClaimsJws(token)
-            .getBody()
-            .getSubject();
-}
+    public String extractUsername(String token) {
+        System.out.println("Extracting username for token: {}"+ token);
+        return Jwts.parser()
+                .setSigningKey(getKey())
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+    }
 
     public Long extractUserId(String token) {
         try {
@@ -56,6 +58,19 @@ public String extractUsername(String token) {
         } catch (Exception e) {
             System.out.println("Error extracting user id"+ e);
             throw new IllegalArgumentException("Invalid token or userId not found", e);
+        }
+    }
+    public String extractRoleName(String token) {
+        try {
+            JwtParser parser = Jwts.parserBuilder()
+                    .setSigningKey(SECRET_KEY) // cheia ta secretă
+                    .build();
+
+            return parser.parseClaimsJws(token)
+                    .getBody()
+                    .get("userRole", String.class); // extragere corectă ca String
+        } catch (JwtException e) {
+            throw new IllegalArgumentException("Invalid token", e);
         }
     }
 

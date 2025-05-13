@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class CommentService {
@@ -138,6 +139,7 @@ public class CommentService {
         return commentMapper.toDto(comment);
     }
 
-
-
+    public boolean existsById(Long id) {
+        return commentRepository.existsById(id);
+    }
 }

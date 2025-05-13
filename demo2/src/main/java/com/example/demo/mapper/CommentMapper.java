@@ -2,8 +2,15 @@ package com.example.demo.mapper;
 
 import com.example.demo.dto.commentdto.CommentCreateDTO;
 import com.example.demo.dto.commentdto.CommentDTO;
+import com.example.demo.dto.postdto.PostDTO;
+import com.example.demo.dto.reactiondto.ReactionCountDTO;
 import com.example.demo.entity.Comment;
 import org.springframework.stereotype.Component;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 public class CommentMapper {
@@ -47,5 +54,9 @@ public class CommentMapper {
         comment.setContent(commentCreateDto.getContent());
         comment.setImageUrl(commentCreateDto.getImageUrl());
         return comment;
+    }
+
+    public List<CommentDTO> toDtoList(Collection<Comment> comments) {
+        return comments.stream().map(this::toDto).collect(Collectors.toList());
     }
 }

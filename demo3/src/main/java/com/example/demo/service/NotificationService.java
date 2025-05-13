@@ -28,7 +28,7 @@ public class NotificationService {
 
     public void markNotificationAsRead(Long notificationId) {
         notificationRepository.findById(notificationId).ifPresent(
-                    notification -> { notification.setRead(true);
+                    notification -> {notification.setRead(true);
                     notificationRepository.save(notification);
         });
     }

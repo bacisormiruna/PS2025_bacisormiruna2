@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reactions")
@@ -27,6 +28,20 @@ public class ReactionController {
             @RequestParam Long targetId,
             @RequestParam TargetType targetType) {
         return ResponseEntity.ok(reactionService.getReactionsForTarget(targetId, targetType));
+    }
+
+    @GetMapping("/count")
+    public ResponseEntity<Long> countReactions(
+            @RequestParam Long targetId,
+            @RequestParam TargetType targetType) {
+        return ResponseEntity.ok(reactionService.countReactions(targetId, targetType));
+    }
+
+    @PostMapping("/count-batch")
+    public ResponseEntity<Map<Long, Long>> countReactionsForMultipleTargets(
+            @RequestParam List<Long> targetIds,
+            @RequestParam TargetType targetType) {
+        return ResponseEntity.ok(reactionService.countReactionsForMultipleTargets(targetIds, targetType));
     }
 
 }

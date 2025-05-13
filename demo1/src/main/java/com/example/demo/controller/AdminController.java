@@ -7,7 +7,6 @@ import com.example.demo.entity.User;
 import com.example.demo.errorhandler.UserException;
 import com.example.demo.repository.RoleRepository;
 import com.example.demo.repository.UserRepository;
-import com.example.demo.service.AdminService;
 import com.example.demo.service.JWTService;
 import com.example.demo.service.UserService;
 import com.example.demo.validator.UserFieldValidator;
@@ -30,7 +29,6 @@ import java.util.Optional;
 public class AdminController{
 
     private final UserService userService;
-    private final AdminService adminService;
     private final JWTService jwtService;
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
@@ -124,7 +122,6 @@ public class AdminController{
             userToSave.setPassword(encoder.encode(userToSave.getPassword()));
             Long userId = userRepository.save(userToSave).getId();
             return ResponseEntity.status(HttpStatus.CREATED).body(userId);
-
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");

@@ -15,10 +15,7 @@ import com.example.demo.entity.Role;
 import com.example.demo.entity.User;
 import com.example.demo.entity.UserPrincipal;
 import com.example.demo.enumeration.NotificationType;
-import com.example.demo.errorhandler.CommentNotFoundException;
-import com.example.demo.errorhandler.PostNotFoundException;
-import com.example.demo.errorhandler.UnauthorizedException;
-import com.example.demo.errorhandler.UserException;
+import com.example.demo.errorhandler.*;
 import com.example.demo.repository.RoleRepository;
 import com.example.demo.repository.UserRepository;
 import com.example.demo.validator.UserFieldValidator;
@@ -31,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -51,6 +49,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
@@ -61,6 +60,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +68,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class UserService{
 
     private final RoleRepository roleRepository;
@@ -76,14 +75,29 @@ public class UserService{
     private final FriendshipService friendshipService;
     private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
 
-    @Autowired
+    private final JWTService jwtService;
     private AuthenticationManager authenticationManager;
-    @Autowired
-    private JWTService jwtService;
-
-    @Autowired
     private final WebClient webClientBuilder;
+    private final WebClient moderatorClient;
     private final ObjectMapper objectMapper;
+
+    public UserService(RoleRepository roleRepository,
+                       UserRepository userRepository,
+                       FriendshipService friendshipService,
+                       AuthenticationManager authenticationManager,
+                       JWTService jwtService,
+                       @Qualifier("postsMicroserviceClient") WebClient postsClient,
+                       @Qualifier("moderatorMicroserviceClient") WebClient moderatorClient,
+                       ObjectMapper objectMapper) {
+        this.roleRepository = roleRepository;
+        this.userRepository = userRepository;
+        this.friendshipService = friendshipService;
+        this.authenticationManager = authenticationManager;
+        this.jwtService = jwtService;
+        this.webClientBuilder = postsClient;
+        this.moderatorClient = moderatorClient;
+        this.objectMapper = objectMapper;
+    }
 
     public List<UserViewDTO> findAllUserView() {
 
@@ -138,14 +152,11 @@ public class UserService{
 
     public Long updateUser(UserDTO userDTO) throws UserException {
         List<String> errors = UserFieldValidator.validateInsertOrUpdate(userDTO);
-
         if(!errors.isEmpty())
         {
             throw new UserException(StringUtils.collectionToDelimitedString(errors, "\n"));
         }
-
         Optional<Role> role = roleRepository.findRoleByName(userDTO.getRoleName().toUpperCase());
-
         if (role.isEmpty()) {
             throw new UserException("Role not found with name field: " + userDTO.getRoleName().toUpperCase());
         }
@@ -168,9 +179,7 @@ public class UserService{
         return userRepository.save(user.get()).getId();
     }
     public void deleteUser(Long id) throws UserException {
-
         Optional<User> user = userRepository.findById(id);
-
         if (user.isEmpty()) {
             throw new UserException("User not found with id field: " + id);
         }
@@ -187,27 +196,17 @@ public class UserService{
                 .collect(Collectors.toList());
     }
 
-//    public String verify(UserDTO userDTO) throws UserException {
-//        Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(userDTO.getName(),userDTO.getPassword()));
-//        if(authentication.isAuthenticated())
-//            return jwtService.generateToken(userDTO);
-//        return "fail";
-//    }
-
     public String verify(UserDTO loginDTO) throws UserException {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginDTO.getName(), loginDTO.getPassword())
         );
-
         if (!authentication.isAuthenticated()) {
             throw new UserException("Login failed. Invalid credentials.");
         }
-
         User user = userRepository.findByName(loginDTO.getName());
         if (user == null) {
             throw new UserException("User not found");
         }
-
         UserDTO userDTO = UserDTO.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -221,7 +220,6 @@ public class UserService{
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(userDTO.getName(), userDTO.getPassword())
         );
-
         if (!authentication.isAuthenticated()) {
             throw new UserException("Login failed. Invalid credentials.");
         }
@@ -232,28 +230,6 @@ public class UserService{
         return jwtService.generateToken(userDTO);
     }
 
-
-    public Long getAuthenticatedUserId() throws UserException {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (principal instanceof UserDetails) {
-            String username = ((UserDetails) principal).getUsername();
-            User user = userRepository.findByName(username);
-            return user.getId();
-        }
-        throw new UserException("User not authenticated");
-    }
-
-    public String getAuthenticatedUsername() throws UserException {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (principal instanceof UserDetails) {
-            String username = ((UserDetails) principal).getUsername();
-            User user = userRepository.findByName(username);
-            return user.getName();
-        }
-        throw new UserException("User not authenticated");
-    }
-
-
     public void changeUserRole(Long id, String roleName) throws UserException {
         User user = userRepository.findById(id).orElseThrow(() -> new UserException("User not found"));
         Role role = roleRepository.findRoleByName(roleName).orElseThrow(() -> new UserException("Role not found"));
@@ -262,6 +238,7 @@ public class UserService{
     }
 
     public Flux<PostDTO> getPostsFromM2(String authHeader) {
+        //checkIfUserBlocked(jwtService.extractUserId(authHeader));
         return webClientBuilder
                 .get()
                 .uri("/api/posts")
@@ -297,15 +274,15 @@ public class UserService{
             builder.part("image", imageFile.getResource())
                     .filename(imageFile.getOriginalFilename());
         }
-
+       // checkIfUserBlocked(userId);
         return webClientBuilder.post()
-                .uri("/api/posts") // Sau numele din service discovery
+                .uri("/api/posts")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .header("Authorization", authHeader)
                 .body(BodyInserters.fromMultipartData(builder.build()))
                 .retrieve()
                 .bodyToMono(PostDTO.class)
-                .block(); // Folosim block() pentru că avem nevoie de răspuns sincron
+                .block();
     }
 
 //updatePost
@@ -331,9 +308,9 @@ public class UserService{
             builder.part("image", imageFile.getResource())
                     .filename(imageFile.getOriginalFilename());
         }
-
+        //checkIfUserBlocked(userId);
         return webClientBuilder.put()
-                .uri("/api/posts/" + postId) // Sau numele din service discovery
+                .uri("/api/posts/" + postId)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .header("Authorization", authHeader)
                 .body(BodyInserters.fromMultipartData(builder.build()))
@@ -345,6 +322,7 @@ public class UserService{
     public void deletePost(Long postId, String username, Long userId, String authHeader) {
         try {
             String userRole = getUserRoleById(userId);
+
             if (userRole.equals("moderator")) {
                 webClientBuilder.delete()
                         .uri("/api/posts/" + postId)
@@ -353,6 +331,7 @@ public class UserService{
                         .toBodilessEntity()
                         .block();
             } else {
+                //checkIfUserBlocked(userId);
                 PostDTO postDTO = getPostDTOById(postId);
                 if (postDTO.getUsername().equals(username)) {
                     webClientBuilder.delete()
@@ -374,8 +353,8 @@ public class UserService{
         }
     }
 
-    //sa adaug partea de getFeed
     public List<PostDTO> getPostsByUserFromOtherService(String username) {
+        //checkIfUserBlockedByUsername(username);
         return webClientBuilder.get()
                 .uri("/api/posts/user/{username}", username)  // Apelăm endpoint-ul din al doilea microserviciu
                 .retrieve()
@@ -391,6 +370,7 @@ public class UserService{
 
     public PostDTO addHashtagsToUserPost(Long postId, List<String> hashtags, String username, String token) {
         try {
+            //checkIfUserBlocked(jwtService.extractUserId(token));
             return webClientBuilder.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/api/posts/{postId}/hashtags")
@@ -425,6 +405,7 @@ public class UserService{
 
     public List<PostDTO> filterPosts(String username, String content, String hashtag) {
         System.out.println("UserService: Filtering posts with username=" + username + ", content=" + content + ", hashtag=" + hashtag);
+        //checkIfUserBlockedByUsername(username);
         try {
             return webClientBuilder
                     .get()
@@ -454,6 +435,7 @@ public class UserService{
     public List<PostDTO> getMyAndFriendsPosts(Long userId) throws UserException {
         List<Long> friendIds = friendshipService.getFriendIds(userId);
         friendIds.add(userId);
+        //checkIfUserBlocked(userId);
         return webClientBuilder.post()
                 .uri("/api/posts/publicByUserIds")
                 .bodyValue(friendIds)
@@ -464,6 +446,7 @@ public class UserService{
     }
 
     public CommentDTO createCommentForPost(Long postId, CommentCreateDTO commentCreateDto, String token) {
+        //checkIfUserBlocked(jwtService.extractUserId(token));
         return webClientBuilder.post()
                 .uri("/api/comments/addComment/{postId}", postId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -478,6 +461,7 @@ public class UserService{
     }
 
     public CommentDTO updateCommentForPost(Long postId, CommentCreateDTO commentCreateDto, String token) {
+       // checkIfUserBlocked(jwtService.extractUserId(token));
         return webClientBuilder.put()
                 .uri("/api/comments/updateComment/{postId}", postId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -517,6 +501,7 @@ public class UserService{
 
             CommentDTO commentDTO = getCommentDTOById(commentId);
             if (commentDTO.getUsername().equals(username)) {
+                //checkIfUserBlocked(userId); // înainte de webClient.post()
                 webClientBuilder
                         .delete()
                         .uri("/api/comments/deleteComment/" + commentId)
@@ -542,9 +527,30 @@ public class UserService{
             Long userId = jwtService.extractUserId(token);
             dto.setUserId(userId);
         }
+        //checkIfUserBlocked(dto.getUserId()); // înainte de webClient.post()
         webClientBuilder
                 .post()
-                .uri("/api/posts/{postId}/react", postId)
+                .uri("/api/posts/{postId}/reactToPost", postId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .bodyValue(dto)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(body -> Mono.error(new RuntimeException("Error from post service: " + body)))
+                )
+                .toBodilessEntity()
+                .block();
+    }
+
+    public void sendReactionToComm(Long commentId, ReactionCreateDTO dto, String token) {
+        if (dto.getUserId() == null) {
+            Long userId = jwtService.extractUserId(token);
+            dto.setUserId(userId);
+        }
+        //checkIfUserBlocked(dto.getUserId());
+        webClientBuilder
+                .post()
+                .uri("/api/posts/{commentId}/reactToComm", commentId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .bodyValue(dto)
                 .retrieve()
@@ -557,6 +563,7 @@ public class UserService{
     }
 
     public PostDTO getPostWithReactions(Long postId, String token) {
+        //checkIfUserBlocked(jwtService.extractUserId(token));
         return webClientBuilder
                 .get()
                 .uri("/api/posts/reactions/{id}", postId)
@@ -586,6 +593,7 @@ public class UserService{
     }
 
     public String getUserRoleById(Long userId) {
+        //checkIfUserBlocked(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -620,6 +628,34 @@ public class UserService{
                 .toBodilessEntity()
                 .block();
     }
+
+//    public void checkIfUserBlocked(Long userId) {
+//        User user = userRepository.findById(userId)
+//                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+//
+//        if (user.isBlocked()) {
+//            throw new UserBlockedException("Contul a fost blocat");
+//        }
+//    }
+
+    public void checkIfUserBlocked(Long userId) throws UserException {
+        try {
+            ResponseEntity<Boolean> response =
+                    moderatorClient.get()
+                    .uri("/api/validator/users/{userId}/isBlocked", userId)
+                    .retrieve()
+                    .toEntity(Boolean.class)
+                    .block();
+
+            if (response != null && response.getBody() != null && response.getBody()) {
+                throw new UserException("Your account has been blocked. Please contact support for assistance.");
+            }
+        } catch (WebClientResponseException e) {
+            // În caz de eroare de comunicare, permitem login-ul pentru a nu bloca utilizatorii
+            //log.error("Error checking if user is blocked: {}", e.getMessage());
+        }
+    }
+
 
 
 

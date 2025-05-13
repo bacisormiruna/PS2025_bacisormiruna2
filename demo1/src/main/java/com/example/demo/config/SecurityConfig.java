@@ -25,23 +25,6 @@ public class SecurityConfig {
     @Autowired
     private JwtFilter jwtFilter;
 
-//    @Bean
-//    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-//        return http
-//                .csrf(customizer -> customizer.disable()) //daca facem sesiunile stateless, nu mai avem nevoie de csrf
-//                .authorizeHttpRequests(request -> request
-//                        // .requestMatchers("api/user/create","api/user/login").permitAll()
-//                        // .requestMatchers("api/admin/create","api/admin/login").permitAll()
-//                        // .requestMatchers("/api/admin/changeRole/").hasAuthority("ADMIN")
-//                        // .requestMatchers("/api/user").hasAuthority("USER")
-//                        .requestMatchers("/api/user/**").permitAll()
-//                        .anyRequest().authenticated())
-//                .httpBasic(Customizer.withDefaults()) //for Postman
-//                .sessionManagement(session ->
-//                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))//new session id for postman that works
-//                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-//                .build();
-//    }
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http

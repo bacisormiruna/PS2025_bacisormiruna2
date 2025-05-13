@@ -33,14 +33,16 @@ public class JwtFilter extends OncePerRequestFilter{
         String token = null;
         String username = null;
         Long userId = null;
+        String userRole = null;
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
             username = jwtService.extractUsername(token);
             userId = jwtService.extractUserId(token);
+            userRole = jwtService.extractRoleName(token);
         }
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null && userId != null) {
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null && userId != null && userRole != null) {
             UserDetails userDetails = null;
             try {
                 userDetails = context.getBean(MyUserDetailsService.class).loadUserByUsername(username);

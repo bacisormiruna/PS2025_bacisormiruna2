@@ -37,5 +37,4 @@ public class CommentDTO {
         this.createdAt = createdAt;
     }
     private List<ReactionCountDTO> reactions;
-
 }

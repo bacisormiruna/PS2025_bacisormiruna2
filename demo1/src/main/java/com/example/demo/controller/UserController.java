@@ -1,5 +1,4 @@
 package com.example.demo.controller;
-
 import com.example.demo.dto.commentdto.CommentCreateDTO;
 import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.postdto.PostCreateDTO;
@@ -13,26 +12,33 @@ import com.example.demo.errorhandler.UserException;
 import com.example.demo.service.JWTService;
 import com.example.demo.service.UserService;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 
 @RestController
 @CrossOrigin
 @RequestMapping(value = "/api/user")
-@RequiredArgsConstructor
 public class UserController {
 
+    private final WebClient webClient3;
+    private final WebClient webClient2;
     private final UserService userService;
     private final JWTService jwtService;
+
+    public UserController(@Qualifier("moderatorMicroserviceClient") WebClient webClient3, @Qualifier("postsMicroserviceClient") WebClient webClient2,UserService userService,JWTService jwtService ) {
+        this.webClient3 = webClient3;
+        this.webClient2 = webClient2;
+        this.userService=userService;
+        this.jwtService=jwtService;
+    }
 
     @RequestMapping(value = "/getAll", method = RequestMethod.GET)
     public ResponseEntity<?> displayAllUserView(){
@@ -63,6 +69,7 @@ public class UserController {
     public ResponseEntity<String> login(@RequestBody UserDTO loginDTO) {
         try {
             String token = userService.verify(loginDTO);
+            userService.checkIfUserBlocked(jwtService.extractUserId(token));
             return ResponseEntity.ok(token);
         } catch (UserException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
@@ -313,24 +320,6 @@ public class UserController {
         }
     }
 
-//    @DeleteMapping("/deleteComment/{commentId}")
-//    public ResponseEntity<?> deleteCommentThroughUserService(
-//            @PathVariable Long commentId,
-//            @RequestHeader("Authorization") String authHeader) {
-//
-//        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
-//        }
-//
-//        try {
-//            userService.deleteCommentFromPost(commentId, authHeader.substring(7));
-//            return ResponseEntity.noContent().build();
-//
-//        } catch (RuntimeException e) {
-//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-//        }
-//    }
-
     @DeleteMapping("/deleteComment/{commentId}")
     public ResponseEntity<?> deleteCommentForUser(
             @PathVariable Long commentId,
@@ -403,6 +392,24 @@ public class UserController {
         }
     }
 
+    @PostMapping("/reactToComm/{commentId}")
+    public ResponseEntity<?> reactToCommThroughUserService(
+            @PathVariable Long commentId,
+            @RequestBody ReactionCreateDTO reactionCreateDto,
+            @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+
+        try {
+            String token = authHeader.substring(7);
+            userService.sendReactionToComm(commentId, reactionCreateDto, token);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
     @GetMapping("/getPostWithReactions/{postId}")
     public ResponseEntity<?> getPostWithReactionsThroughUserService(
             @PathVariable Long postId,
@@ -435,4 +442,237 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
+
+    @GetMapping("/verify/{userId}")
+    public ResponseEntity<String> verifyUser(@PathVariable Long userId,
+                                             @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+
+        String token = authHeader.substring(7); // extragem tokenul
+        System.out.println("Token extras în verifyUser: " + token); // log ajutător
+        //Long id= jwtService.extractUserId(token);
+        System.out.println("Id-ul în verifyUser: " + jwtService.extractUserId(token));
+
+        try {
+            String userRole = userService.getUserRoleById(userId).toLowerCase();
+            if (userRole.equals("moderator")) {
+                return ResponseEntity.ok("Moderator");
+            }else if (userRole.equals("user")) {
+                return ResponseEntity.ok("User");
+            }
+            else if (userRole.equals("admin")) {
+                return ResponseEntity.ok("Admin");
+            }
+            else {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Utilizator neautorizat");
+            }
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/checkModerator")
+    public ResponseEntity<String> checkIfModerator(@RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+        String token = authHeader;
+        Boolean isModerator = webClient3
+                .get()
+                .uri("/api/validator/isModerator")
+                .header("Authorization", token)
+                .retrieve()
+                .bodyToMono(Boolean.class)
+                .block();
+
+        if (Boolean.TRUE.equals(isModerator)) {
+            return ResponseEntity.ok("DA, utilizatorul este moderator.");
+        } else {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("NU, utilizatorul nu este moderator.");
+        }
+    }
+
+//    @PutMapping("/users/{userId}/block")
+//    public Mono<ResponseEntity<String>> blockUser(
+//            @PathVariable Long userId,
+//            @RequestBody String reason,
+//            @RequestHeader("Authorization") String authHeader) {
+//
+//        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+//            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token."));
+//        }
+//        String token = authHeader.substring(7);
+//        return webClient3
+//                .put()
+//                .uri("/api/validator/users/{userId}/block", userId)
+//                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+//                .contentType(MediaType.APPLICATION_JSON)
+//                .bodyValue(reason)
+//                .retrieve()
+//                .bodyToMono(String.class)
+//                .map(response -> {
+//                    return ResponseEntity.ok("User successfully blocked");
+//                })
+//                .onErrorResume(e -> {
+//                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage()));
+//                });
+//    }
+
+    @PutMapping("/users/{userId}/block")
+    public Mono<ResponseEntity<String>> blockUser(
+            @PathVariable Long userId,
+            @RequestBody String reason,
+            @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token."));
+        }
+
+        String token = authHeader.substring(7);
+
+        return webClient3
+                .put()
+                .uri("/api/validator/users/{userId}/block", userId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(reason)
+                .exchangeToMono(response -> {
+                    HttpStatusCode statusCode = response.statusCode();
+                    return response.bodyToMono(String.class)
+                            .defaultIfEmpty("")
+                            .flatMap(body -> {
+                                if (statusCode.is2xxSuccessful()) {
+                                    return Mono.just(ResponseEntity.ok("User successfully blocked"));
+                                } else if (statusCode.is4xxClientError()) {
+                                    // Verifică dacă mesajul conține indicația că utilizatorul e deja blocat
+                                    if (body.contains("already blocked")) {
+                                        // Returnează direct un ResponseEntity cu status BAD_REQUEST
+                                        return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                                .body("User with ID " + userId + " is already blocked."));
+                                    } else {
+                                        return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                                .body("Client error: " + body));
+                                    }
+                                } else if (statusCode.is5xxServerError()) {
+                                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                            .body("Server error: " + body));
+                                } else {
+                                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                            .body("Unexpected response: " + body));
+                                }
+                            });
+                })
+                .onErrorResume(e -> {
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body("Unexpected error: " + e.getMessage()));
+                });
+    }
+
+
+    @PutMapping("/users/{userId}/unblock")
+    public Mono<ResponseEntity<String>> unblockUser(
+            @PathVariable Long userId,
+            @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token."));
+        }
+        String token = authHeader.substring(7);
+        return webClient3
+                .put()
+                .uri("/api/validator/users/{userId}/unblock", userId) // Adresăm cererea către microserviciul de deblocare
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .bodyToMono(String.class)
+                .map(response -> {
+                    return ResponseEntity.ok("User successfully unblocked");
+                })
+                .onErrorResume(e -> {
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage()));
+                });
+    }
+
+    @PostMapping("/delete-post-from-m1")
+    public Mono<ResponseEntity<String>> deletePostFromM1(@RequestParam Long postId,
+                                                         @RequestParam Long authorId,
+                                                         @RequestParam String reason,
+                                                         @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token."));
+        }
+        String token = authHeader.substring(7);
+        return webClient3
+                .post()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/validator/delete-post")
+                        .queryParam("postId", postId)
+                        .queryParam("authorId", authorId)
+                        .queryParam("reason", reason)
+                        .build())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .exchangeToMono(response -> {
+                    HttpStatusCode statusCode = response.statusCode();
+                    return response.bodyToMono(String.class)
+                            .defaultIfEmpty("")
+                            .flatMap(body -> {
+                                if (statusCode.is2xxSuccessful()) {
+                                    return Mono.just(ResponseEntity.ok("Post successfully marked as deleted"));
+                                } else if (statusCode.is4xxClientError()) {
+                                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error deleting post: " + body));
+                                } else if (statusCode.is5xxServerError()) {
+                                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Server error: " + body));
+                                } else {
+                                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected response: " + body));
+                                }
+                            });
+                })
+                .onErrorResume(e -> {
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected error: " + e.getMessage()));
+                });
+    }
+
+
+    @PostMapping("/delete-comment-from-m1")
+    public Mono<ResponseEntity<String>> deleteCommentFromM1(@RequestParam Long commentId,
+                                                            @RequestParam Long authorId,
+                                                            @RequestParam String reason,
+                                                            @RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token."));
+        }
+        String token = authHeader.substring(7);
+        return webClient3
+                .post()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/validator/delete-comment")
+                        .queryParam("commentId", commentId)
+                        .queryParam("authorId", authorId)
+                        .queryParam("reason", reason)
+                        .build())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .exchangeToMono(response -> {
+                    HttpStatusCode statusCode = response.statusCode();
+                    return response.bodyToMono(String.class)
+                            .defaultIfEmpty("")
+                            .flatMap(body -> {
+                                if (statusCode.is2xxSuccessful()) {
+                                    return Mono.just(ResponseEntity.ok("Comment successfully marked as deleted"));
+                                } else if (statusCode.is4xxClientError()) {
+                                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error deleting comment: " + body));
+                                } else if (statusCode.is5xxServerError()) {
+                                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Server error: " + body));
+                                } else {
+                                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected response: " + body));
+                                }
+                            });
+                })
+                .onErrorResume(e -> {
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected error: " + e.getMessage()));
+                });
+    }
+
+
+
+
 }

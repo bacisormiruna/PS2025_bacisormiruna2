@@ -1,6 +1,5 @@
 package com.example.demo.entity;
 
-import com.example.demo.enumeration.NotificationType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,19 +9,21 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "notifications")
+@Table(name = "activity")
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Notification {
+@Builder
+public class ActivityLog{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    private Long moderatorId;
     private Long userId;
-    private String message;
+    private Long postId;
+    private Long commentId;
+    private boolean isBlocked;
+    private String reason;
     private LocalDateTime timestamp;
-    @Column(name = "`read`")
-    private boolean read;
-    private NotificationType notificationType;
 }
+

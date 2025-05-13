@@ -8,11 +8,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface CommentRepository extends JpaRepository<Comment, Long> {
-    @EntityGraph(attributePaths = {"comments", "hashtags"})
-    @Query("SELECT p FROM Post p WHERE p.id = :postId")
-    Optional<Post> findByIdWithCommentsAndHashtags(@Param("postId") Long postId);
+    List<Comment> findCommentByPostId(Long postId);
+    boolean existsById(Long id);
 }

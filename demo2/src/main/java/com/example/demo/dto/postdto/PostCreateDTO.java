@@ -16,8 +16,6 @@ public class PostCreateDTO {
     private String content;
     private String imageUrl;
     private Boolean isPublic;
-//    private LocalDateTime createdAt;
-//    private LocalDateTime updatedAt;
     private List<CommentDTO> comments;
     private Set<HashtagDTO> hashtags;
 }

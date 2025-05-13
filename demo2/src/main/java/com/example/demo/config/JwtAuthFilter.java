@@ -32,13 +32,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
             try {
-                // doar validare simplă
                 if (jwtService.validateToken(token)) {
                     System.out.println("Token valid în Microserviciul 2");
-                    // aici poți extrage informații dacă ai nevoie:
                     String username = jwtService.extractUsername(token);
                     Long userId = jwtService.extractUserId(token);
-                    System.out.println("Username extras: " + username + " | UserId extras: " + userId);
+                    String userRole = jwtService.extractRoleName(token);
+                    System.out.println("Username extras: " + username + " | UserId extras: " + userId+ " | UserRole extras: " + userRole);
                 } else {
                     System.out.println("Token invalid");
                     response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token invalid");
@@ -50,7 +49,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
         }
-
         filterChain.doFilter(request, response);
     }
 }

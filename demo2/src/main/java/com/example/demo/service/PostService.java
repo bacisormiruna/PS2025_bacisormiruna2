@@ -6,13 +6,17 @@ import com.example.demo.dto.postdto.PostCreateDTO;
 import com.example.demo.dto.postdto.PostDTO;
 import com.example.demo.dto.reactiondto.ReactionCountDTO;
 import com.example.demo.dto.reactiondto.ReactionCreateDTO;
+import com.example.demo.dto.reactiondto.TotalReactionsDTO;
 import com.example.demo.entity.Hashtag;
 import com.example.demo.entity.Post;
 import com.example.demo.enumeration.NotificationType;
 import com.example.demo.enumeration.TargetType;
+import com.example.demo.errorhandler.AlreadyReactedException;
 import com.example.demo.errorhandler.PostNotFoundException;
 import com.example.demo.errorhandler.UnauthorizedException;
+import com.example.demo.mapper.CommentMapper;
 import com.example.demo.mapper.PostMapper;
+import com.example.demo.repository.CommentRepository;
 import com.example.demo.repository.PostRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +33,8 @@ import java.util.stream.Collectors;
 public class PostService {
     @Autowired
     private PostRepository postRepository;
+    @Autowired
+    private CommentMapper commentMapper;
     @Autowired
     private PostMapper postMapper;
     @Autowired
@@ -112,20 +118,6 @@ public class PostService {
         return postMapper.toDto(updatedPost);
     }
 
-
-//    @Transactional
-//    public void deletePost(Long postId, String username) {
-//        Post post = postRepository.findById(postId)
-//                .orElseThrow(() -> new PostNotFoundException("Post not found with id: " + postId));
-//
-//        if (!post.getUsername().equals(username) && !username.equals("Moderator")) {
-//            throw new UnauthorizedException("You can only delete your own posts or posts as a moderator");
-//        }
-//        post.getHashtags().clear();
-//        postRepository.saveAndFlush(post);
-//        postRepository.delete(post);
-//
-//    }
 
     @Transactional
     public void deletePost(Long postId, String username) {
@@ -227,39 +219,29 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
-//    @Transactional
-//    public void sendReaction(ReactionCreateDTO dto, String token) {
-//        webClientBuilder
-//                .post()
-//                .uri("/api/reactions/react") // reaction-service
-//                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-//                .bodyValue(dto)
-//                .retrieve()
-//                .onStatus(HttpStatusCode::isError, response ->
-//                        response.bodyToMono(String.class)
-//                                .flatMap(body -> Mono.error(new RuntimeException("Error from reaction service: " + body)))
-//                )
-//                .toBodilessEntity()
-//                .block();
-//    }
-@Transactional
-public void sendReaction(ReactionCreateDTO dto, String token) {
-    // elimină prefixul dacă este deja prezent
-    String cleanedToken = token.startsWith("Bearer ") ? token.substring(7) : token;
+    @Transactional
+    public void sendReaction(ReactionCreateDTO dto, String token) {
+        String cleanedToken = token.startsWith("Bearer ") ? token.substring(7) : token;
 
-    webClientBuilder
-            .post()
-            .uri("/api/reactions/react") // reaction-service
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + cleanedToken)
-            .bodyValue(dto)
-            .retrieve()
-            .onStatus(HttpStatusCode::isError, response ->
-                    response.bodyToMono(String.class)
-                            .flatMap(body -> Mono.error(new RuntimeException("Error from reaction service: " + body)))
-            )
-            .toBodilessEntity()
-            .block();
-}
+        webClientBuilder
+                .post()
+                .uri("/api/reactions/react")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + cleanedToken)
+                .bodyValue(dto)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class)
+                                .flatMap(body -> {
+                                    if (response.statusCode().value() == 409) {
+                                        return Mono.error(new AlreadyReactedException(body));
+                                    } else {
+                                        return Mono.error(new RuntimeException("Error from reaction service: " + body));
+                                    }
+                                })
+                )
+                .toBodilessEntity()
+                .block();
+    }
 
 
     public List<ReactionCountDTO> getReactionsForTarget(Long targetId, TargetType targetType) {
@@ -301,10 +283,11 @@ public void sendReaction(ReactionCreateDTO dto, String token) {
                         }
                 ))
                 .collect(Collectors.toList());
-
         dto.setComments(sortedComments);
+        postMapper.fillTotalReactions(dto);
         return dto;
     }
+
 
     public List<PostDTO> getAllPostsWithReactions() {
         List<Post> posts = postRepository.findAll();
@@ -315,4 +298,29 @@ public void sendReaction(ReactionCreateDTO dto, String token) {
                 .map(this::getPostWithReactions)
                 .collect(Collectors.toList());
     }
+
+    public PostDTO getPostWithCommentsAndReactions(Long postId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new PostNotFoundException("Post not found with id " + postId));
+        return getPostWithReactions(post);
+    }
+
+
+    public TotalReactionsDTO computeTotalReactions(Long postId) {
+        PostDTO post = getPostWithCommentsAndReactions(postId);
+        long postReactions = post.getReactions() != null
+                ? post.getReactions().stream().mapToLong(ReactionCountDTO::getCount).sum()
+                : 0;
+        long commentReactions = post.getComments() != null
+                ? post.getComments().stream()
+                .flatMap(comment -> comment.getReactions().stream())
+                .mapToLong(ReactionCountDTO::getCount)
+                .sum()
+                : 0;
+        return new TotalReactionsDTO(postReactions, commentReactions, postReactions + commentReactions);
+    }
+    public boolean existsById(Long id) {
+        return postRepository.existsById(id);
+    }
+
 }

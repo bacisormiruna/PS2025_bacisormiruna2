@@ -65,32 +65,6 @@ public class CommentController {
         return ResponseEntity.ok(commentService.updateComment(commentId, commentDto, username));
     }
 
-//    @DeleteMapping("/deleteComment/{commentId}")
-//    public ResponseEntity<Void> deleteComment(HttpServletRequest request, @PathVariable Long commentId) {
-//        String username = (String) request.getAttribute("username");
-//        commentService.deleteComment(commentId, username);
-//        return ResponseEntity.noContent().build();
-//    }
-
-//    @DeleteMapping("/deleteComment/{commentId}")
-//    public ResponseEntity<?> deleteComment(
-//            @PathVariable Long commentId,
-//            @RequestHeader("Authorization") String authHeader) {
-//        try {
-//            String token = authHeader.substring(7);
-//            String username = jwtService.extractUsername(token);
-//            commentService.deleteComment(commentId, username);
-//            return ResponseEntity.noContent().build();
-//        } catch (CommentNotFoundException e) {
-//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Comment not found");
-//        } catch (UnauthorizedException e) {
-//            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-//        } catch (Exception e) {
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-//                    .body("Error when deleting comment: " + e.getMessage());
-//        }
-//    }
-
     @DeleteMapping("/deleteComment/{commentId}")
     public ResponseEntity<?> deleteComment(
             @PathVariable Long commentId,
@@ -115,5 +89,12 @@ public class CommentController {
                     .body("Error when deleting comment: " + e.getMessage());
         }
     }
+
+    @GetMapping("/comments/exists/{id}")
+    public ResponseEntity<Boolean> checkCommentExists(@PathVariable Long id) {
+        boolean exists = commentService.existsById(id);
+        return ResponseEntity.ok(exists);
+    }
+
 
 }

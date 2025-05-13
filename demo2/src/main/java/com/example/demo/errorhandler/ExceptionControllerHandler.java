@@ -30,4 +30,8 @@ public class ExceptionControllerHandler {
                 .build();
         return new ResponseEntity<>(httpErrorResponse, httpStatus);
     }
+    @ExceptionHandler(AlreadyReactedException.class)
+    public ResponseEntity<String> handleAlreadyReactedException(AlreadyReactedException ex) {
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.CONFLICT);
+    }
 }

@@ -25,23 +25,13 @@ public class JWTService {
     //private final UserService userService;
     private String key =""; //"m6AlbnFzbCYyYW6BIGdlbmVyYXRlZCBrZXkgZm9yIIIIc3Rpbmc?";
     private static final String SECRET_KEY = "m6AlbnFzbCYyYW6BIGdlbmVyYXRlZCBrZXkgZm9yIIIIc3Rpbmc?";
-//    public JWTService(UserService userService) {
-//        try {
-//            KeyGenerator keyGenerator= KeyGenerator.getInstance("HmacSHA256");
-//            SecretKey secretKey= keyGenerator.generateKey();
-//            key=Base64.getEncoder().encodeToString(secretKey.getEncoded());
-//        } catch (NoSuchAlgorithmException e) {
-//            throw new RuntimeException(e);
-//        }
-//        this.userService = userService;
-//    }
 
 
     public String generateToken(UserDTO userDTO) throws UserException {
         Map<String, Object> claims = new HashMap<>();
         claims.put("name", userDTO.getName());
         claims.put("id", userDTO.getId());  // Modificat de la "userId" la "id" pentru consistență
-
+        claims.put("userRole", userDTO.getRoleName());
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(userDTO.getName())
@@ -51,7 +41,6 @@ public class JWTService {
                 .signWith(SignatureAlgorithm.HS256, SECRET_KEY)
                 .compact();
     }
-
 
     public String generatToken(String username) {
     return Jwts.builder()
@@ -83,6 +72,21 @@ public class JWTService {
             throw new IllegalArgumentException("Invalid token", e);
         }
     }
+
+    public String extractRoleName(String token) {
+        try {
+            JwtParser parser = Jwts.parserBuilder()
+                    .setSigningKey(SECRET_KEY) // cheia ta secretă
+                    .build();
+
+            return parser.parseClaimsJws(token)
+                    .getBody()
+                    .get("userRole", String.class); // extragere corectă ca String
+        } catch (JwtException e) {
+            throw new IllegalArgumentException("Invalid token", e);
+        }
+    }
+
 
     private <T> T extractClaim(String token, Function<Claims, T> claimResolver){
         final Claims claims = extractAllClaims(token);

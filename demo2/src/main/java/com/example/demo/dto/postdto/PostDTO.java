@@ -3,9 +3,7 @@ package com.example.demo.dto.postdto;
 import com.example.demo.dto.commentdto.CommentDTO;
 import com.example.demo.dto.hashtagdto.HashtagDTO;
 import com.example.demo.dto.reactiondto.ReactionCountDTO;
-import com.example.demo.entity.Comment;
-import com.example.demo.entity.Hashtag;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.example.demo.dto.reactiondto.TotalReactionsDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -30,5 +28,6 @@ public class PostDTO {
     private List<CommentDTO> comments;
     private Set<HashtagDTO> hashtags;
     private List<ReactionCountDTO> reactions;
-
+    private Long totalReactions;
+    private long totalReactionsForComments;
 }

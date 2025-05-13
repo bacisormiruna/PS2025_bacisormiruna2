@@ -14,9 +14,10 @@ import java.util.Optional;
 public interface ReactionRepository extends JpaRepository<Reaction, Long> {
 
     Optional<Reaction> findByUserIdAndTargetIdAndTargetType(Long userId, Long targetId, TargetType targetType);
-
-    List<Reaction> findByTargetIdAndTargetType(Long targetId, TargetType targetType);
-
     @Query("SELECT r.type, COUNT(r) FROM Reaction r WHERE r.targetId = :targetId AND r.targetType = :targetType GROUP BY r.type")
     List<Object[]> countReactionsByType(@Param("targetId") Long targetId, @Param("targetType") TargetType targetType);
+    @Query("SELECT COUNT(r) FROM Reaction r WHERE r.targetId = :targetId AND r.targetType = :targetType")
+    Long countAllReactionsByTargetIdAndType(@Param("targetId") Long targetId, @Param("targetType") TargetType targetType);
+    @Query("SELECT r.targetId, COUNT(r) FROM Reaction r WHERE r.targetId IN :targetIds AND r.targetType = :targetType GROUP BY r.targetId")
+    List<Object[]> countReactionsByTargetIdsAndType(@Param("targetIds") List<Long> targetIds, @Param("targetType") TargetType targetType);
 }

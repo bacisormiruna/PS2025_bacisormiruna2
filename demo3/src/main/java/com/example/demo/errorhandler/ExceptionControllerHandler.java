@@ -30,4 +30,27 @@ public class ExceptionControllerHandler {
                 .build();
         return new ResponseEntity<>(httpErrorResponse, httpStatus);
     }
+    @ExceptionHandler(AlreadyReactedException.class)
+    public ResponseEntity<String> handleAlreadyReactedException(AlreadyReactedException ex) {
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.CONFLICT); // 409 Conflict
+    }
+
+    @ExceptionHandler(UserAlreadyBlockedException.class)
+    public ResponseEntity<HttpErrorResponse> handleUserAlreadyBlockedException(UserAlreadyBlockedException exception) {
+        LOGGER.error("User already blocked: " + exception.getMessage());
+        return createHttpResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(UserNotBlockedException.class)
+    public ResponseEntity<HttpErrorResponse> handleUserNotBlockedException(UserNotBlockedException exception) {
+        LOGGER.error("User not blocked: " + exception.getMessage());
+        return createHttpResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<HttpErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
+        LOGGER.error("Error deleting post: " + ex.getMessage());
+        return createHttpResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
 }

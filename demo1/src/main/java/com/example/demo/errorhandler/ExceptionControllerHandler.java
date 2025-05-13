@@ -36,4 +36,22 @@ public class ExceptionControllerHandler {
                 .build();
         return new ResponseEntity<>(httpErrorResponse, httpStatus);
     }
+    @ExceptionHandler(AlreadyReactedException.class)
+    public ResponseEntity<String> handleAlreadyReactedException(AlreadyReactedException ex) {
+        return new ResponseEntity<>(ex.getMessage(), HttpStatus.CONFLICT); // 409 Conflict
+    }
+    @ExceptionHandler(UserBlockedException.class)
+    public ResponseEntity<String> handleUserBlocked(UserBlockedException ex) {
+        return ResponseEntity.status(403).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(UserAlreadyBlockedException.class)
+    public ResponseEntity<HttpErrorResponse> handleUserAlreadyBlockedException(UserAlreadyBlockedException exception) {
+        return createHttpResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(UserNotBlockedException.class)
+    public ResponseEntity<HttpErrorResponse> handleUserNotBlockedException(UserNotBlockedException exception) {
+        return createHttpResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
 }
