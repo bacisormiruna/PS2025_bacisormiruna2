@@ -1,4 +1,5 @@
 package com.example.demo.service;
+import com.example.demo.dto.activitylogdto.ActivityLogDTO;
 import com.example.demo.entity.ActivityLog;
 import com.example.demo.errorhandler.UserAlreadyBlockedException;
 import com.example.demo.errorhandler.UserNotBlockedException;
@@ -11,7 +12,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -83,6 +86,7 @@ public class ModeratorService {
                     ActivityLog log = ActivityLog.builder()
                             .postId(postId)
                             .userId(authorId)
+                            .isBlocked(true) //am pus pe 0 sa fie neblocat si pe false sa fie blocat
                             .moderatorId(jwtService.extractUserId(token))
                             .reason(reason)
                             .timestamp(LocalDateTime.now())
@@ -93,23 +97,6 @@ public class ModeratorService {
                 });
     }
 
-
-//    @Transactional
-//    public boolean deleteCommentAsModerator(Long commentId, Long authorId, String reason, String token) {
-//        Optional<ActivityLog> existing = activityLogRepository.findByCommentId(commentId);
-//        if (existing.isPresent()) {
-//            throw new IllegalStateException("Comment already marked as deleted by a moderator.");
-//        }
-//        ActivityLog log = ActivityLog.builder()
-//                .commentId(commentId)
-//                .userId(authorId)
-//                .moderatorId(jwtService.extractUserId(token))
-//                .reason(reason)
-//                .timestamp(LocalDateTime.now())
-//                .build();
-//        activityLogRepository.save(log);
-//        return true;
-//    }
 
     @Transactional
     public Mono<Boolean> deleteCommentAsModerator(Long commentId, Long authorId, String reason, String token) {
@@ -128,14 +115,54 @@ public class ModeratorService {
                     ActivityLog log = ActivityLog.builder()
                             .commentId(commentId)
                             .userId(authorId)
+                            .isBlocked(true)//am pus pe 0 sa fie deblocat si pe 1 sa fie blocat adica true=0 adica neblocat si false=1 care inseamna blocat
                             .moderatorId(jwtService.extractUserId(token))
                             .reason(reason)
                             .timestamp(LocalDateTime.now())
                             .build();
-
                     activityLogRepository.save(log);
                     return Mono.just(true);
                 });
+    }
+
+//    public List<ActivityLogDTO> getActivitiesByUserId(Long userId) {
+//        return activityLogRepository.findByUserId(userId).stream()
+//                .map(activity -> ActivityLogDTO.builder()
+//                        .moderatorId(activity.getModeratorId())
+//                        .userId(activity.getUserId())
+//                        .postId(activity.getPostId())
+//                        .commentId(activity.getCommentId())
+//                        .isBlocked(activity.isBlocked())
+//                        .reason(activity.getReason())
+//                        .timestamp(activity.getTimestamp())
+//                        .build())
+//                .collect(Collectors.toList());
+//    }
+//
+
+    public List<ActivityLogDTO> getActivitiesByUserId(String token) {
+        String role = jwtService.extractRoleName(token);
+        Long userId = jwtService.extractUserId(token);
+
+        List<ActivityLog> activities;
+
+        if ("moderator".equalsIgnoreCase(role)) {
+            activities = activityLogRepository.findAll();
+        } else {
+            activities = activityLogRepository.findByUserId(userId);
+        }
+
+        return activities.stream()
+                .map(activity -> ActivityLogDTO.builder()
+                        .moderatorId(activity.getModeratorId())
+                        .userId(activity.getUserId())
+                        .postId(activity.getPostId())
+                        .commentId(activity.getCommentId())
+                        .isBlocked(activity.isBlocked())
+                        .reason(activity.getReason())
+                        .timestamp(activity.getTimestamp())
+                        .build())
+                .collect(Collectors.toList());
     }
 
 

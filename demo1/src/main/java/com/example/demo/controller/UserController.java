@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
@@ -494,32 +495,6 @@ public class UserController {
         }
     }
 
-//    @PutMapping("/users/{userId}/block")
-//    public Mono<ResponseEntity<String>> blockUser(
-//            @PathVariable Long userId,
-//            @RequestBody String reason,
-//            @RequestHeader("Authorization") String authHeader) {
-//
-//        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-//            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token."));
-//        }
-//        String token = authHeader.substring(7);
-//        return webClient3
-//                .put()
-//                .uri("/api/validator/users/{userId}/block", userId)
-//                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-//                .contentType(MediaType.APPLICATION_JSON)
-//                .bodyValue(reason)
-//                .retrieve()
-//                .bodyToMono(String.class)
-//                .map(response -> {
-//                    return ResponseEntity.ok("User successfully blocked");
-//                })
-//                .onErrorResume(e -> {
-//                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage()));
-//                });
-//    }
-
     @PutMapping("/users/{userId}/block")
     public Mono<ResponseEntity<String>> blockUser(
             @PathVariable Long userId,
@@ -529,9 +504,7 @@ public class UserController {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token."));
         }
-
         String token = authHeader.substring(7);
-
         return webClient3
                 .put()
                 .uri("/api/validator/users/{userId}/block", userId)
@@ -546,9 +519,7 @@ public class UserController {
                                 if (statusCode.is2xxSuccessful()) {
                                     return Mono.just(ResponseEntity.ok("User successfully blocked"));
                                 } else if (statusCode.is4xxClientError()) {
-                                    // Verifică dacă mesajul conține indicația că utilizatorul e deja blocat
                                     if (body.contains("already blocked")) {
-                                        // Returnează direct un ResponseEntity cu status BAD_REQUEST
                                         return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
                                                 .body("User with ID " + userId + " is already blocked."));
                                     } else {
@@ -672,7 +643,29 @@ public class UserController {
                 });
     }
 
-
+    @GetMapping("/notifications")
+    public Mono<ResponseEntity<List>> getNotifications(@RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
+        }
+        String token = authHeader.substring(7);
+        Long userId;
+        try {
+            userId = jwtService.extractUserId(token);
+        } catch (Exception e) {
+            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Collections.emptyList()));
+        }
+        return webClient3
+                .get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/validator/activity-log")
+                        .build(userId))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .bodyToMono(List.class)
+                .map(ResponseEntity::ok)
+                .onErrorResume(e -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.emptyList())));
+    }
 
 
 }

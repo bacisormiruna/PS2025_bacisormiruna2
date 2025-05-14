@@ -1,4 +1,5 @@
 package com.example.demo.controller;
+import com.example.demo.dto.activitylogdto.ActivityLogDTO;
 import com.example.demo.errorhandler.UserAlreadyBlockedException;
 import com.example.demo.errorhandler.UserNotBlockedException;
 import com.example.demo.service.JWTService;
@@ -8,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/validator")
@@ -107,6 +110,10 @@ public class ModeratorController {
         }
 
         String token = authHeader.substring(7);
+        String role = jwtService.extractRoleName(token);
+        if (!role.equalsIgnoreCase("moderator")) {
+            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only moderators can delete posts."));
+        }
 
         return moderatorService.deletePostAsModerator(postId, authorId, reason, token)
                 .map(success -> ResponseEntity.ok("Post marked as deleted."))
@@ -130,7 +137,10 @@ public class ModeratorController {
         }
 
         String token = authHeader.substring(7);
-
+        String role = jwtService.extractRoleName(token);
+        if (!role.equalsIgnoreCase("moderator")) {
+            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only moderators can delete comments."));
+        }
         return moderatorService.deleteCommentAsModerator(commentId, authorId, reason, token)
                 .map(success -> ResponseEntity.ok("Comment marked as deleted."))
                 .onErrorResume(IllegalArgumentException.class, e ->
@@ -140,6 +150,26 @@ public class ModeratorController {
                 .onErrorResume(Exception.class, e -> {
                     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error deleting comment: " + e.getMessage()));
                 });
+    }
+
+//    @GetMapping("/notifications/{userId}")
+//    public ResponseEntity<List<ActivityLogDTO>> getActivities(@PathVariable Long userId) {
+//        List<ActivityLogDTO> activities =moderatorService.getActivitiesByUserId(userId);
+//        return ResponseEntity.ok(activities);
+//    }
+
+    @GetMapping("/activity-log")
+    public ResponseEntity<?> getActivityLog(@RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+        }
+        String token = authHeader.substring(7);
+        try {
+            List<ActivityLogDTO> activities = moderatorService.getActivitiesByUserId(token);
+            return ResponseEntity.ok(activities);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error retrieving activity log: " + e.getMessage());
+        }
     }
 
 
