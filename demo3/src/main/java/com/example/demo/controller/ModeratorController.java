@@ -172,6 +172,18 @@ public class ModeratorController {
         }
     }
 
+    @GetMapping("isPostDeleted/{postId}")
+    public ResponseEntity<Boolean> isPostDeleted(@PathVariable Long postId) {
+        boolean deleted = moderatorService.existsByPostId(postId);
+        return ResponseEntity.ok(deleted);
+    }
+
+    @GetMapping("isCommentDeleted/{commentId}")
+    public ResponseEntity<Boolean> isCommentDeleted(@PathVariable Long commentId) {
+        boolean deleted = moderatorService.existsByCommentId(commentId);
+        return ResponseEntity.ok(deleted);
+    }
+
 
 
 

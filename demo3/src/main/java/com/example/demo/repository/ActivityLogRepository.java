@@ -11,4 +11,6 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, Long> 
     Optional<ActivityLog> findByPostId(Long postId);
     Optional<ActivityLog> findByCommentId(Long postId);
     List<ActivityLog> findByUserId(Long userId);
+    boolean existsByPostId(Long postId);
+    boolean existsByCommentId(Long commentId);
 }

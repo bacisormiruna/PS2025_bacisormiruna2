@@ -165,6 +165,12 @@ public class ModeratorService {
                 .collect(Collectors.toList());
     }
 
+    public boolean existsByPostId(Long postId) {
+        return activityLogRepository.existsByPostId(postId);
+    }
+    public boolean existsByCommentId(Long commentId) {
+        return activityLogRepository.existsByCommentId(commentId);
+    }
 
 
 

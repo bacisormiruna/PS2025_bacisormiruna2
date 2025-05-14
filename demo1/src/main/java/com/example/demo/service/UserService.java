@@ -484,7 +484,6 @@ public class UserService{
             }
             String userRole = getUserRoleById(userId);
             System.out.println("User role: " + userRole);
-
             if (userRole.equals("moderator")) {
                 webClientBuilder
                         .delete()
@@ -498,10 +497,8 @@ public class UserService{
                         .block();
                 return;
             }
-
             CommentDTO commentDTO = getCommentDTOById(commentId);
             if (commentDTO.getUsername().equals(username)) {
-                //checkIfUserBlocked(userId); // înainte de webClient.post()
                 webClientBuilder
                         .delete()
                         .uri("/api/comments/deleteComment/" + commentId)
@@ -527,7 +524,6 @@ public class UserService{
             Long userId = jwtService.extractUserId(token);
             dto.setUserId(userId);
         }
-        //checkIfUserBlocked(dto.getUserId()); // înainte de webClient.post()
         webClientBuilder
                 .post()
                 .uri("/api/posts/{postId}/reactToPost", postId)
@@ -547,7 +543,6 @@ public class UserService{
             Long userId = jwtService.extractUserId(token);
             dto.setUserId(userId);
         }
-        //checkIfUserBlocked(dto.getUserId());
         webClientBuilder
                 .post()
                 .uri("/api/posts/{commentId}/reactToComm", commentId)
@@ -563,7 +558,6 @@ public class UserService{
     }
 
     public PostDTO getPostWithReactions(Long postId, String token) {
-        //checkIfUserBlocked(jwtService.extractUserId(token));
         return webClientBuilder
                 .get()
                 .uri("/api/posts/reactions/{id}", postId)
@@ -593,7 +587,6 @@ public class UserService{
     }
 
     public String getUserRoleById(Long userId) {
-        //checkIfUserBlocked(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -614,18 +607,6 @@ public class UserService{
              //   .header(HttpHeaders.AUTHORIZATION, "Bearer " + authToken) // Asigură-te că folosești tokenul corect
                 .retrieve()
                 .bodyToMono(CommentDTO.class)
-                .block();
-    }
-
-    public void sendNotification(Long userId, String message, NotificationType type) {
-        userRepository.findById(userId);
-        NotificationDTO notificationDTO = new NotificationDTO(userId, message, type);
-        webClientBuilder
-                .post()
-                .uri("/api/notifications")
-                .bodyValue(notificationDTO)
-                .retrieve()
-                .toBodilessEntity()
                 .block();
     }
 

@@ -216,7 +216,7 @@ public class UserController {
                     .body("Error updating post: " + e.getMessage());
         }
     }
-//stergerea unei postari
+
     @DeleteMapping("/posts/{postId}")
     public ResponseEntity<?> deletePost(
             @PathVariable Long postId,
@@ -380,12 +380,23 @@ public class UserController {
             @PathVariable Long postId,
             @RequestBody ReactionCreateDTO reactionCreateDto,
             @RequestHeader("Authorization") String authHeader) {
+
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
         }
 
         try {
             String token = authHeader.substring(7);
+            Boolean isDeleted = webClient3.get()
+                    .uri("/api/validator/isPostDeleted/{postId}", postId)
+                    .retrieve()
+                    .bodyToMono(Boolean.class)
+                    .block();
+
+            if (Boolean.TRUE.equals(isDeleted)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("This post was deleted by a moderator and cannot receive reactions.");
+            }
             userService.sendReactionToPost(postId, reactionCreateDto, token);
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
@@ -401,15 +412,24 @@ public class UserController {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
         }
-
         try {
             String token = authHeader.substring(7);
+            Boolean isDeleted = webClient3.get()
+                    .uri("/api/validator/isCommentDeleted/{commentId}", commentId)
+                    .retrieve()
+                    .bodyToMono(Boolean.class)
+                    .block();
+            if (Boolean.TRUE.equals(isDeleted)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("This comment was deleted by a moderator and cannot receive reactions.");
+            }
             userService.sendReactionToComm(commentId, reactionCreateDto, token);
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
+
 
     @GetMapping("/getPostWithReactions/{postId}")
     public ResponseEntity<?> getPostWithReactionsThroughUserService(
