@@ -632,8 +632,6 @@ public class UserService{
                 throw new UserException("Your account has been blocked. Please contact support for assistance.");
             }
         } catch (WebClientResponseException e) {
-            // În caz de eroare de comunicare, permitem login-ul pentru a nu bloca utilizatorii
-            //log.error("Error checking if user is blocked: {}", e.getMessage());
         }
     }
 

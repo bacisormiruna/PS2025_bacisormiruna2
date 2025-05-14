@@ -20,8 +20,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 @RestController
@@ -431,6 +431,23 @@ public class UserController {
     }
 
 
+//    @GetMapping("/getPostWithReactions/{postId}")
+//    public ResponseEntity<?> getPostWithReactionsThroughUserService(
+//            @PathVariable Long postId,
+//            @RequestHeader("Authorization") String authHeader) {
+//        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
+//        }
+//
+//        try {
+//            String token = authHeader.substring(7);
+//            PostDTO postWithReactions = userService.getPostWithReactions(postId, token);
+//            return ResponseEntity.ok(postWithReactions);
+//        } catch (RuntimeException e) {
+//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+//        }
+//    }
+
     @GetMapping("/getPostWithReactions/{postId}")
     public ResponseEntity<?> getPostWithReactionsThroughUserService(
             @PathVariable Long postId,
@@ -438,15 +455,36 @@ public class UserController {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
         }
-
         try {
             String token = authHeader.substring(7);
+            Boolean isPostDeleted = webClient3.get()
+                    .uri("/api/validator/isPostDeleted/{postId}", postId)
+                    .retrieve()
+                    .bodyToMono(Boolean.class)
+                    .block();
+
+            if (Boolean.TRUE.equals(isPostDeleted)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("This post was deleted by a moderator and cannot be displayed.");
+            }
             PostDTO postWithReactions = userService.getPostWithReactions(postId, token);
+            List<CommentDTO> filteredComments = postWithReactions.getComments().stream()
+                    .filter(comment -> {
+                        Boolean isCommentDeleted = webClient3.get()
+                                .uri("/api/validator/isCommentDeleted/{commentId}", comment.getId())
+                                .retrieve()
+                                .bodyToMono(Boolean.class)
+                                .block();
+                        return !Boolean.TRUE.equals(isCommentDeleted);
+                    })
+                    .collect(Collectors.toList());
+            postWithReactions.setComments(filteredComments);
             return ResponseEntity.ok(postWithReactions);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
+
 
     @GetMapping("/getAllPostsWithReactions")
     public ResponseEntity<?> getAllPostsWithReactionsThroughUserService(
@@ -454,15 +492,39 @@ public class UserController {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid token.");
         }
-
         try {
             String token = authHeader.substring(7);
             List<PostDTO> posts = userService.getAllPostsWithReactions(token);
-            return ResponseEntity.ok(posts);
+            List<PostDTO> filteredPosts = posts.stream()
+                    .filter(post -> {
+                        Boolean isPostDeleted = webClient3.get()
+                                .uri("/api/validator/isPostDeleted/{postId}", post.getId())
+                                .retrieve()
+                                .bodyToMono(Boolean.class)
+                                .block();
+                        return !Boolean.TRUE.equals(isPostDeleted);
+                    })
+                    .map(post -> {
+                        List<CommentDTO> filteredComments = post.getComments().stream()
+                                .filter(comment -> {
+                                    Boolean isCommentDeleted = webClient3.get()
+                                            .uri("/api/validator/isCommentDeleted/{commentId}", comment.getId())
+                                            .retrieve()
+                                            .bodyToMono(Boolean.class)
+                                            .block();
+                                    return !Boolean.TRUE.equals(isCommentDeleted);
+                                })
+                                .collect(Collectors.toList());
+                        post.setComments(filteredComments);
+                        return post;
+                    })
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(filteredPosts);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
+
 
     @GetMapping("/verify/{userId}")
     public ResponseEntity<String> verifyUser(@PathVariable Long userId,
